@@ -1,0 +1,39 @@
+[project]
+name = "stock-agent"
+version = "0.1.0"
+description = "Multi-agent stock research application using Streamlit, RAG, and Amazon Bedrock"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.38",
+    "langchain>=0.3",
+    "langchain-aws>=0.2",
+    "langgraph>=0.4",
+    "pandas>=2.2",
+    "pydantic-settings>=2.9",
+    "psycopg[binary]>=3.2",
+    "pypdf>=5.5",
+    "requests>=2.32",
+    "streamlit>=1.45",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.11",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/stock_agent"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
