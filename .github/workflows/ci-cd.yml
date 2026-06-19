@@ -22,11 +22,26 @@ jobs:
       - run: uv run pytest
 
   build-and-deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      vars.AWS_DEPLOY_ENABLED == 'true'
     needs: test
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@v4
+      - name: Validate deployment configuration
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+          EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+        run: |
+          test -n "$AWS_ROLE_ARN" || { echo "::error::Missing AWS_ROLE_ARN secret"; exit 1; }
+          test -n "$AWS_REGION" || { echo "::error::Missing AWS_REGION variable"; exit 1; }
+          test -n "$ECR_REPOSITORY" || { echo "::error::Missing ECR_REPOSITORY variable"; exit 1; }
+          test -n "$EC2_INSTANCE_ID" || { echo "::error::Missing EC2_INSTANCE_ID variable"; exit 1; }
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
