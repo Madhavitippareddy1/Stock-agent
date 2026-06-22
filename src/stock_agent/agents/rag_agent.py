@@ -20,6 +20,14 @@ def _retrieve(question: str, chunks: list[tuple[str, str]], limit: int = 6) -> l
     return [(source, chunk) for score, source, chunk in sorted(scored, reverse=True)[:limit] if score]
 
 
+def _is_summary_request(question: str) -> bool:
+    lowered = question.lower()
+    return any(
+        phrase in lowered
+        for phrase in ("summarize", "summary", "analyse this", "analyze this", "above report")
+    )
+
+
 class RagAgent:
     def __init__(
         self,
@@ -41,10 +49,15 @@ class RagAgent:
             documents.append(
                 ("Uploaded document", extract_text(uploaded_content, uploaded_content_type))
             )
-        if self.reports:
+        elif self.reports:
             for report in self.reports.list_reports(tickers):
                 content, content_type = self.reports.download(report.key)
-                documents.append((f"s3://{self.reports.settings.reports_bucket}/{report.key}", extract_text(content, content_type)))
+                documents.append(
+                    (
+                        f"s3://{self.reports.settings.reports_bucket}/{report.key}",
+                        extract_text(content, content_type),
+                    )
+                )
 
         chunks = [
             (source, chunk)
@@ -52,6 +65,8 @@ class RagAgent:
             for chunk in chunk_text(text)
         ]
         matches = _retrieve(question, chunks)
+        if uploaded_content and _is_summary_request(question):
+            matches = chunks[:6]
         if not matches:
             return AgentResult(
                 agent="RAG Agent",
@@ -65,8 +80,9 @@ class RagAgent:
                 context,
                 (
                     "You are a financial-report research assistant. Answer only from the supplied "
-                    "context, distinguish facts from interpretation, cite source labels, and never "
-                    "present the response as investment advice."
+                    "context. Never introduce another company or external report that is not present "
+                    "in the context. Distinguish facts from interpretation, cite source labels, and "
+                    "never present the response as investment advice."
                 ),
             )
         else:

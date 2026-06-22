@@ -88,6 +88,11 @@ The RAG Agent:
 4. Scores chunks against the question.
 5. Sends top passages to Amazon Bedrock Converse with a grounded prompt.
 
+Uploaded documents are isolated from the S3 corpus. When a user uploads a
+report, the RAG Agent analyzes only that file; S3 reports are searched only
+when no upload is present. This prevents unrelated company data from being
+mixed into document summaries.
+
 For larger production collections, replace lexical retrieval with OpenSearch
 Serverless or Aurora PostgreSQL/pgvector and persist Bedrock embeddings during
 the SEC synchronization phase.
