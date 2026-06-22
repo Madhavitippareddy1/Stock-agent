@@ -30,7 +30,13 @@ class BedrockService:
     def embed(self, text: str) -> list[float]:
         response = self.client.invoke_model(
             modelId=self.settings.bedrock_embedding_model_id,
-            body=json.dumps({"inputText": text}),
+            body=json.dumps(
+                {
+                    "inputText": text,
+                    "dimensions": self.settings.embedding_dimension,
+                    "normalize": True,
+                }
+            ),
             accept="application/json",
             contentType="application/json",
         )

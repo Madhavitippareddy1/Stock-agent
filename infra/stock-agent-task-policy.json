@@ -25,6 +25,14 @@
         "bedrock:InvokeModelWithResponseStream"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "QueryOpenSearchServerless",
+      "Effect": "Allow",
+      "Action": [
+        "aoss:APIAccessAll"
+      ],
+      "Resource": "arn:aws:aoss:eu-west-2:666127452756:collection/8sxalipy464p1anut4s6"
     }
   ]
 }

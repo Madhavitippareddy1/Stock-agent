@@ -1,0 +1,9 @@
+{
+  "Rules": [
+    {
+      "ResourceType": "collection",
+      "Resource": ["collection/stock-agent-vectors"]
+    }
+  ],
+  "AWSOwnedKey": true
+}

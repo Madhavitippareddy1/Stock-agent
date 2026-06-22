@@ -1,0 +1,32 @@
+[
+  {
+    "Rules": [
+      {
+        "ResourceType": "collection",
+        "Resource": ["collection/stock-agent-vectors"],
+        "Permission": [
+          "aoss:CreateCollectionItems",
+          "aoss:DeleteCollectionItems",
+          "aoss:UpdateCollectionItems",
+          "aoss:DescribeCollectionItems"
+        ]
+      },
+      {
+        "ResourceType": "index",
+        "Resource": ["index/stock-agent-vectors/*"],
+        "Permission": [
+          "aoss:CreateIndex",
+          "aoss:DeleteIndex",
+          "aoss:UpdateIndex",
+          "aoss:DescribeIndex",
+          "aoss:ReadDocument",
+          "aoss:WriteDocument"
+        ]
+      }
+    ],
+    "Principal": [
+      "arn:aws:iam::666127452756:role/aws-reserved/sso.amazonaws.com/eu-west-2/AWSReservedSSO_AdministratorAccess_a03ab89203a24f9a",
+      "arn:aws:iam::666127452756:role/stock-agent-ecs-task-role"
+    ]
+  }
+]

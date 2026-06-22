@@ -67,12 +67,20 @@ def build_supervisor(settings: Settings | None = None) -> SupervisorAgent:
     settings = settings or get_settings()
     from stock_agent.services.bedrock_service import BedrockService
     from stock_agent.services.s3_reports import S3ReportRepository
+    from stock_agent.services.vector_store import OpenSearchVectorStore
 
     reports = S3ReportRepository(settings) if settings.reports_bucket else None
     bedrock = BedrockService(settings) if settings.reports_bucket else None
+    vector_store = (
+        OpenSearchVectorStore(settings) if settings.opensearch_endpoint else None
+    )
     return SupervisorAgent(
         settings=settings,
-        rag_agent=RagAgent(reports=reports, bedrock=bedrock),
+        rag_agent=RagAgent(
+            reports=reports,
+            bedrock=bedrock,
+            vector_store=vector_store,
+        ),
     )
 
 

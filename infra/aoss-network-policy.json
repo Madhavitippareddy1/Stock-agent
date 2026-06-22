@@ -1,0 +1,15 @@
+[
+  {
+    "Rules": [
+      {
+        "ResourceType": "collection",
+        "Resource": ["collection/stock-agent-vectors"]
+      },
+      {
+        "ResourceType": "dashboard",
+        "Resource": ["collection/stock-agent-vectors"]
+      }
+    ],
+    "AllowFromPublic": true
+  }
+]

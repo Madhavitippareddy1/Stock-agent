@@ -5,6 +5,7 @@ from stock_agent.models import AgentResult
 from stock_agent.services.bedrock_service import BedrockService
 from stock_agent.services.document_service import chunk_text, extract_text
 from stock_agent.services.s3_reports import S3ReportRepository
+from stock_agent.services.vector_store import OpenSearchVectorStore
 
 
 def _terms(value: str) -> Counter[str]:
@@ -33,9 +34,11 @@ class RagAgent:
         self,
         reports: S3ReportRepository | None = None,
         bedrock: BedrockService | None = None,
+        vector_store: OpenSearchVectorStore | None = None,
     ) -> None:
         self.reports = reports
         self.bedrock = bedrock
+        self.vector_store = vector_store
 
     def run(
         self,
@@ -48,6 +51,29 @@ class RagAgent:
         if uploaded_content:
             documents.append(
                 ("Uploaded document", extract_text(uploaded_content, uploaded_content_type))
+            )
+        elif self.vector_store and self.bedrock:
+            matches = self.vector_store.search(self.bedrock.embed(question), tickers)
+            if not matches:
+                return AgentResult(
+                    agent="RAG Agent",
+                    answer="No relevant indexed financial-report content was found.",
+                )
+            context = "\n\n".join(f"[{match.source}]\n{match.text}" for match in matches)
+            answer = self.bedrock.answer(
+                question,
+                context,
+                (
+                    "You are a financial-report research assistant. Answer only from the supplied "
+                    "context. Never introduce another company or external report that is not present "
+                    "in the context. Distinguish facts from interpretation, cite source labels, and "
+                    "never present the response as investment advice."
+                ),
+            )
+            return AgentResult(
+                agent="RAG Agent",
+                answer=answer,
+                sources=list(dict.fromkeys(match.source for match in matches)),
             )
         elif self.reports:
             for report in self.reports.list_reports(tickers):

@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "beautifulsoup4>=4.13",
     "boto3>=1.38",
+    "opensearch-py>=2.8",
     "pandas>=2.2",
     "pydantic-settings>=2.9",
     "pypdf>=5.5",
@@ -30,7 +31,7 @@ build-backend = "hatchling.build"
 packages = ["src/stock_agent"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = [".", "src"]
 testpaths = ["tests"]
 
 [tool.ruff]

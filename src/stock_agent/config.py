@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     aws_region: str = "eu-west-2"
     bedrock_model_id: str = "amazon.nova-lite-v1:0"
     bedrock_embedding_model_id: str = "amazon.titan-embed-text-v2:0"
+    embedding_dimension: int = 1024
+    opensearch_endpoint: str = ""
+    opensearch_index: str = "financial-report-chunks"
     reports_bucket: str = ""
     reports_prefix: str = "financial-reports"
     sec_user_agent: str = "StockAgent/0.1 contact@example.com"

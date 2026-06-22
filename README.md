@@ -2,6 +2,7 @@
 
 A production-oriented multi-agent stock research application built with
 Streamlit, Yahoo Finance, SEC EDGAR, Amazon S3, Amazon Bedrock,
+Amazon OpenSearch Serverless,
 Docker, Amazon ECR, and Amazon ECS Fargate.
 
 ## Main flow
@@ -10,7 +11,8 @@ Docker, Amazon ECR, and Amazon ECS Fargate.
 
 Specialist agents:
 
-- RAG Agent searches uploaded PDF/text files and financial reports in S3.
+- RAG Agent searches uploaded PDF/text files and uses Titan embeddings plus
+  ticker-filtered OpenSearch Serverless vector search for financial reports in S3.
 - Stock Data Agent queries Yahoo Finance for prices and financial statements.
 - Supervisor Agent selects the appropriate tools and combines responses.
 
