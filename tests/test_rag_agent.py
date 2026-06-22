@@ -25,6 +25,31 @@ class FakeReports:
         raise AssertionError("S3 must not be searched when a document is uploaded")
 
 
+class FakeBedrock:
+    def embed(self, text):
+        return [0.1] * 1024
+
+    def answer(self, question, context, system_prompt):
+        return context
+
+
+class FakeVectorStore:
+    def search(self, embedding, tickers):
+        from stock_agent.services.vector_store import VectorMatch
+
+        assert tickers == ("AAPL",)
+        return [
+            VectorMatch(
+                text="Apple annual revenue increased.",
+                source="s3://reports/AAPL/annual.json",
+                ticker="AAPL",
+                period="annual",
+                year="2025",
+                score=0.9,
+            )
+        ]
+
+
 def test_uploaded_document_is_isolated_from_s3_reports() -> None:
     result = RagAgent(reports=FakeReports()).run(
         "Analyse this above report and give summary",
@@ -44,3 +69,12 @@ def test_generic_summary_request_uses_uploaded_chunks_without_keyword_overlap() 
         "text/plain",
     )
     assert "Uploaded document" in result.answer
+
+
+def test_rag_agent_uses_ticker_filtered_vector_search() -> None:
+    result = RagAgent(
+        bedrock=FakeBedrock(),
+        vector_store=FakeVectorStore(),
+    ).run("Summarize annual revenue", ("AAPL",))
+    assert result.sources == ["s3://reports/AAPL/annual.json"]
+    assert "Apple annual revenue" in result.answer

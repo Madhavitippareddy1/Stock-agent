@@ -5,13 +5,21 @@
 The application supports a configurable universe of ten large NASDAQ-listed
 stocks: NVDA, GOOGL, AAPL, MSFT, AMZN, META, AVGO, TSLA, COST, and NFLX.
 
+Development environment resource names:
+
+- ECS cluster: `dev-dsmay-stock-agent-cluster`
+- ECS service: `dev-dsmay-stock-agent-ecs`
+- ECR repository: `dev-dsmay-stock-agent-repo`
+- S3 reports bucket: `dev-dsmay-stock-agent-bucket`
+
 The request path is:
 
 1. The user chooses companies, enters text, and optionally uploads a PDF or
    text report in Streamlit.
 2. The Supervisor Agent detects whether the request needs report retrieval,
    stock data, or a combination.
-3. The RAG Agent retrieves relevant passages from the upload and S3 reports.
+3. The RAG Agent retrieves relevant passages from the upload or the
+   OpenSearch Serverless vector index backed by S3 reports.
 4. The Stock Data Agent calls Yahoo Finance through `yfinance`.
 5. Results and source links are returned to Streamlit.
 
@@ -21,7 +29,7 @@ The request path is:
 app.py                              Streamlit UI
 src/stock_agent/
   agents/                           Supervisor specialist agents
-  services/                         Bedrock, S3, document and DB adapters
+  services/                         Bedrock, S3, OpenSearch and document adapters
   tools/                            Yahoo stock-data and SEC EDGAR tools
   config.py                         Environment configuration
 infra/ecs-task-definition.json      ECS Fargate task template
@@ -37,6 +45,8 @@ Install Python 3.12 and `uv`, copy `.env.example` to `.env`, then configure:
 
 - `AWS_REGION`: region containing Bedrock, S3, ECR and ECS.
 - `REPORTS_BUCKET`: private S3 bucket for filings.
+- `OPENSEARCH_ENDPOINT`: OpenSearch Serverless collection endpoint.
+- `OPENSEARCH_INDEX`: vector index name, normally `financial-report-chunks`.
 - `SEC_USER_AGENT`: application name and monitored email address.
 - Bedrock model IDs available in the selected region.
 
@@ -82,20 +92,33 @@ Respect SEC fair-access requirements and use a real contact email.
 
 The RAG Agent:
 
-1. Reads PDF/text uploads and S3 filing objects.
+1. Reads PDF/text uploads directly; persisted reports remain in S3.
 2. Converts PDF or HTML into normalized text.
-3. Splits text into overlapping chunks.
-4. Scores chunks against the question.
-5. Sends top passages to Amazon Bedrock Converse with a grounded prompt.
+3. Splits reports into 1,400-character chunks with 200-character overlap.
+4. Creates normalized 1,024-dimension embeddings with Amazon Titan Text
+   Embeddings V2.
+5. Stores vectors and ticker/period/year/source metadata in an Amazon
+   OpenSearch Serverless vector-search collection.
+6. Embeds each question and runs a ticker-filtered k-NN search.
+7. Sends the top six passages to Amazon Nova Lite through Bedrock Converse
+   with a grounded prompt.
 
 Uploaded documents are isolated from the S3 corpus. When a user uploads a
 report, the RAG Agent analyzes only that file; S3 reports are searched only
 when no upload is present. This prevents unrelated company data from being
 mixed into document summaries.
 
-For larger production collections, replace lexical retrieval with OpenSearch
-Serverless or Aurora PostgreSQL/pgvector and persist Bedrock embeddings during
-the SEC synchronization phase.
+Create or refresh the vector index after S3 synchronization:
+
+```bash
+uv run python scripts/index_reports_opensearch.py --recreate
+```
+
+The OpenSearch data-access policy authorizes the indexing identity and ECS
+task role. The task role also needs `aoss:APIAccessAll` for the collection ARN.
+The current network policy permits the public collection endpoint because ECS
+uses public networking. For production, use private ECS subnets and an
+OpenSearch Serverless VPC endpoint.
 
 ## 6. Phase 4 — Stock data API
 
@@ -140,11 +163,10 @@ Secret:
 Variables:
 
 - `AWS_DEPLOY_ENABLED=true`
-- `AWS_REGION`
-- `ECR_REPOSITORY`
-- `ECS_CLUSTER`
-- `ECS_SERVICE`
-- `ECS_TASK_DEFINITION` (path to a checked-in deployable task definition)
+
+The region, ECR repository, ECS cluster/service, and checked-in task-definition
+path are declared in the workflow `env` section using the development resource
+names above.
 
 The workflow authenticates through GitHub OIDC, tests the code, builds the
 Docker image, pushes the commit-tagged image to ECR, renders the task

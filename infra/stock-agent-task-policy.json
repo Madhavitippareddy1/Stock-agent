@@ -7,7 +7,7 @@
       "Action": [
         "s3:ListBucket"
       ],
-      "Resource": "arn:aws:s3:::stock-agent-reports-666127452756-eu-west-2"
+      "Resource": "arn:aws:s3:::dev-dsmay-stock-agent-bucket"
     },
     {
       "Sid": "ReadFinancialReportObjects",
@@ -15,7 +15,7 @@
       "Action": [
         "s3:GetObject"
       ],
-      "Resource": "arn:aws:s3:::stock-agent-reports-666127452756-eu-west-2/financial-reports/*"
+      "Resource": "arn:aws:s3:::dev-dsmay-stock-agent-bucket/financial-reports/*"
     },
     {
       "Sid": "InvokeBedrock",
@@ -25,6 +25,14 @@
         "bedrock:InvokeModelWithResponseStream"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "QueryOpenSearchServerless",
+      "Effect": "Allow",
+      "Action": [
+        "aoss:APIAccessAll"
+      ],
+      "Resource": "arn:aws:aoss:eu-west-2:666127452756:collection/8sxalipy464p1anut4s6"
     }
   ]
 }

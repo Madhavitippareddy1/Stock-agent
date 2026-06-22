@@ -9,7 +9,7 @@
   "containerDefinitions": [
     {
       "name": "stock-agent",
-      "image": "666127452756.dkr.ecr.eu-west-2.amazonaws.com/stock-agent:latest",
+      "image": "666127452756.dkr.ecr.eu-west-2.amazonaws.com/dev-dsmay-stock-agent-repo:latest",
       "essential": true,
       "portMappings": [
         {
@@ -22,7 +22,10 @@
         {"name": "AWS_REGION", "value": "eu-west-2"},
         {"name": "BEDROCK_MODEL_ID", "value": "amazon.nova-lite-v1:0"},
         {"name": "BEDROCK_EMBEDDING_MODEL_ID", "value": "amazon.titan-embed-text-v2:0"},
-        {"name": "REPORTS_BUCKET", "value": "stock-agent-reports-666127452756-eu-west-2"},
+        {"name": "EMBEDDING_DIMENSION", "value": "1024"},
+        {"name": "OPENSEARCH_ENDPOINT", "value": "https://8sxalipy464p1anut4s6.eu-west-2.aoss.amazonaws.com"},
+        {"name": "OPENSEARCH_INDEX", "value": "financial-report-chunks"},
+        {"name": "REPORTS_BUCKET", "value": "dev-dsmay-stock-agent-bucket"},
         {"name": "REPORTS_PREFIX", "value": "financial-reports"},
         {"name": "SEC_USER_AGENT", "value": "StockAgent/0.1 madhavitippareddy1@example.com"},
         {"name": "STOCK_UNIVERSE", "value": "NVDA,GOOGL,AAPL,MSFT,AMZN,META,AVGO,TSLA,COST,NFLX"}
