@@ -1,9 +1,16 @@
+import re
 from typing import Any
 
 import pandas as pd
 import yfinance as yf
 
 from stock_agent.config import Settings, get_settings
+
+
+COMPANY_SYMBOL_ALIASES = {
+    "cisco": "CSCO",
+    "cisco systems": "CSCO",
+}
 
 
 def normalize_snapshot_frame(frame: pd.DataFrame) -> pd.DataFrame:
@@ -29,12 +36,33 @@ class YahooStockTool:
 
     def validate_ticker(self, ticker: str) -> str:
         normalized = ticker.upper().strip()
-        if normalized not in self.settings.tickers:
-            raise ValueError(
-                f"{normalized} is outside the configured NASDAQ-10 universe: "
-                f"{', '.join(self.settings.tickers)}"
-            )
+        if not re.fullmatch(r"[A-Z][A-Z0-9.-]{0,9}", normalized):
+            raise ValueError(f"{normalized} is not a valid stock symbol")
         return normalized
+
+    def search_symbols(self, query: str, limit: int = 3) -> tuple[str, ...]:
+        normalized_query = query.lower()
+        for company_name, symbol in COMPANY_SYMBOL_ALIASES.items():
+            if re.search(rf"\b{re.escape(company_name)}\b", normalized_query):
+                return (symbol,)
+
+        search_query = re.sub(
+            r"\b(current|latest|live|stock|share|price|quote|market|performance|trading|please|show|give|what|is|the|for|of)\b",
+            " ",
+            query,
+            flags=re.IGNORECASE,
+        )
+        search_query = " ".join(search_query.split()) or query
+        search = yf.Search(search_query, max_results=max(limit, 5), news_count=0)
+        symbols = []
+        for quote in search.quotes:
+            symbol = quote.get("symbol")
+            quote_type = str(quote.get("quoteType", "")).upper()
+            if symbol and quote_type in {"EQUITY", "ETF"}:
+                symbols.append(self.validate_ticker(symbol))
+            if len(symbols) == limit:
+                break
+        return tuple(dict.fromkeys(symbols))
 
     def quote(self, ticker: str) -> dict[str, Any]:
         symbol = self.validate_ticker(ticker)

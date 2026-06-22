@@ -14,18 +14,34 @@ class FakeStockTool:
         return {"ticker": ticker, "price": 210.5, "currency": "USD"}
 
 
+class FakeSearch:
+    quotes = []
+
+
 def test_stock_agent_formats_price() -> None:
     result = StockDataAgent(FakeStockTool()).run(("AAPL",))
     assert "$210.50" in result.answer
 
 
-def test_yahoo_tool_rejects_ticker_outside_universe() -> None:
+def test_yahoo_tool_accepts_valid_ticker_outside_universe() -> None:
     tool = YahooStockTool(Settings(stock_universe="AAPL,MSFT"))
+    assert tool.validate_ticker("CSCO") == "CSCO"
+
+
+def test_yahoo_tool_rejects_invalid_ticker_syntax() -> None:
+    tool = YahooStockTool()
     try:
-        tool.validate_ticker("IBM")
+        tool.validate_ticker("bad ticker!")
         raise AssertionError("Expected validation failure")
     except ValueError as exc:
-        assert "outside" in str(exc)
+        assert "valid stock symbol" in str(exc)
+
+
+def test_company_alias_resolves_cisco_without_vendor_search(monkeypatch) -> None:
+    monkeypatch.setattr("stock_agent.tools.stock_data.yf.Search", FakeSearch)
+    assert YahooStockTool().search_symbols("Cisco Systems share price", limit=1) == (
+        "CSCO",
+    )
 
 
 def test_snapshot_normalization_handles_error_and_missing_rows() -> None:

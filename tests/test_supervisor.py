@@ -9,6 +9,9 @@ class FakeAgent:
     def run(self, *args, **kwargs) -> AgentResult:
         return AgentResult(agent=self.name, answer=f"{self.name} result")
 
+    def resolve_tickers(self, question: str) -> tuple[str, ...]:
+        return ()
+
 
 def test_extract_tickers_returns_selected_symbols() -> None:
     assert extract_tickers("Compare AAPL with NVDA", ("AAPL", "MSFT", "NVDA")) == (
@@ -49,6 +52,11 @@ class TickerCaptureAgent:
         self.tickers = tickers
         return AgentResult(agent="Stock", answer="Stock result")
 
+    def resolve_tickers(self, question: str) -> tuple[str, ...]:
+        if "Cisco Systems" in question:
+            return ("CSCO",)
+        return ()
+
 
 def test_uploaded_filename_scopes_explicit_price_request() -> None:
     stock_agent = TickerCaptureAgent()
@@ -78,3 +86,20 @@ def test_question_ticker_overrides_sidebar_scope() -> None:
         selected_tickers=("NVDA", "GOOGL", "AAPL"),
     )
     assert stock_agent.tickers == ("COST",)
+
+
+def test_company_name_outside_top_ten_resolves_to_single_symbol() -> None:
+    stock_agent = TickerCaptureAgent()
+    supervisor = SupervisorAgent(
+        rag_agent=FakeAgent("RAG"),
+        stock_agent=stock_agent,
+    )
+    result = supervisor.run(
+        "Cisco Systems share price",
+        uploaded_content=b"Unrelated COST annual report",
+        uploaded_content_type="text/plain",
+        uploaded_filename="COST-annual-financial-report.pdf",
+        selected_tickers=("NVDA", "GOOGL", "AAPL"),
+    )
+    assert [section.agent for section in result.sections] == ["Stock"]
+    assert stock_agent.tickers == ("CSCO",)

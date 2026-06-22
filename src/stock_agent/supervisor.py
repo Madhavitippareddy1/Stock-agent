@@ -35,6 +35,25 @@ def _requests_live_stock_data(question: str, has_document: bool) -> bool:
     )
 
 
+def _references_uploaded_document(question: str) -> bool:
+    lowered = question.lower()
+    return any(
+        phrase in lowered
+        for phrase in (
+            "above",
+            "uploaded",
+            "this report",
+            "the report",
+            "document",
+            "pdf",
+            "analyse",
+            "analyze",
+            "summarize",
+            "summary",
+        )
+    )
+
+
 class SupervisorAgent:
     def __init__(
         self,
@@ -49,7 +68,9 @@ class SupervisorAgent:
     def route(self, question: str, has_document: bool) -> tuple[str, ...]:
         lowered = question.lower()
         routes = []
-        if has_document or any(word in lowered for word in ("report", "revenue", "filing", "10-k", "10-q")):
+        if (has_document and _references_uploaded_document(question)) or any(
+            word in lowered for word in ("report", "revenue", "filing", "10-k", "10-q")
+        ):
             routes.append("rag")
         if _requests_live_stock_data(question, has_document):
             routes.append("stock")
@@ -63,14 +84,22 @@ class SupervisorAgent:
         uploaded_filename: str = "",
         selected_tickers: tuple[str, ...] | None = None,
     ) -> ResearchResult:
+        routes = self.route(question, uploaded_content is not None)
+        question_tickers = find_tickers(question, self.settings.tickers)
+        tickers = question_tickers
+        if "stock" in routes and not question_tickers:
+            try:
+                tickers = self.stock_agent.resolve_tickers(question)
+            except (AttributeError, ValueError):
+                tickers = ()
         tickers = (
-            find_tickers(question, self.settings.tickers)
+            tickers
             or find_tickers(uploaded_filename, self.settings.tickers)
             or selected_tickers
             or self.settings.tickers
         )
         sections: list[AgentResult] = []
-        for route in self.route(question, uploaded_content is not None):
+        for route in routes:
             try:
                 if route == "rag":
                     sections.append(
