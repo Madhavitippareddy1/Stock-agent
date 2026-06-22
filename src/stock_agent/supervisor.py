@@ -6,10 +6,33 @@ from stock_agent.config import Settings, get_settings
 from stock_agent.models import AgentResult, ResearchResult
 
 
+def find_tickers(value: str, allowed: tuple[str, ...]) -> tuple[str, ...]:
+    tokens = set(re.findall(r"\b[A-Za-z]{2,5}\b", value.upper()))
+    return tuple(ticker for ticker in allowed if ticker in tokens)
+
+
 def extract_tickers(question: str, allowed: tuple[str, ...]) -> tuple[str, ...]:
-    tokens = set(re.findall(r"\b[A-Za-z]{2,5}\b", question.upper()))
-    selected = tuple(ticker for ticker in allowed if ticker in tokens)
-    return selected or allowed
+    return find_tickers(question, allowed) or allowed
+
+
+def _requests_live_stock_data(question: str, has_document: bool) -> bool:
+    lowered = question.lower()
+    if has_document:
+        return any(
+            phrase in lowered
+            for phrase in (
+                "price",
+                "quote",
+                "market price",
+                "current market",
+                "current stock",
+                "performance",
+                "trading",
+            )
+        )
+    return any(
+        word in lowered for word in ("price", "stock", "market", "quote", "performance")
+    )
 
 
 class SupervisorAgent:
@@ -28,7 +51,7 @@ class SupervisorAgent:
         routes = []
         if has_document or any(word in lowered for word in ("report", "revenue", "filing", "10-k", "10-q")):
             routes.append("rag")
-        if any(word in lowered for word in ("price", "stock", "market", "quote", "performance")):
+        if _requests_live_stock_data(question, has_document):
             routes.append("stock")
         return tuple(routes or ("rag", "stock"))
 
@@ -37,9 +60,15 @@ class SupervisorAgent:
         question: str,
         uploaded_content: bytes | None = None,
         uploaded_content_type: str = "application/pdf",
+        uploaded_filename: str = "",
         selected_tickers: tuple[str, ...] | None = None,
     ) -> ResearchResult:
-        tickers = selected_tickers or extract_tickers(question, self.settings.tickers)
+        tickers = (
+            find_tickers(question, self.settings.tickers)
+            or find_tickers(uploaded_filename, self.settings.tickers)
+            or selected_tickers
+            or self.settings.tickers
+        )
         sections: list[AgentResult] = []
         for route in self.route(question, uploaded_content is not None):
             try:
@@ -87,10 +116,12 @@ def build_supervisor(settings: Settings | None = None) -> SupervisorAgent:
 def run_stock_research(
     question: str,
     pdf_bytes: bytes | None = None,
+    uploaded_filename: str = "",
     selected_tickers: tuple[str, ...] | None = None,
 ) -> ResearchResult:
     return build_supervisor().run(
         question=question,
         uploaded_content=pdf_bytes,
+        uploaded_filename=uploaded_filename,
         selected_tickers=selected_tickers,
     )
