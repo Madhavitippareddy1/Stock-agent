@@ -104,6 +104,9 @@ commercial or latency-sensitive production use.
 NewsAPI uses `/v2/everything`, a 14-day lookback, English results and newest
 articles first. Store the key in AWS Secrets Manager, never in Git.
 
+When `NEWS_API_KEY` is not configured, the News Agent automatically falls back
+to Yahoo Finance company news so research requests remain functional.
+
 ## 7. Phase 5 — Tests
 
 Run:
