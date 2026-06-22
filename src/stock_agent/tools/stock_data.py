@@ -6,6 +6,15 @@ import yfinance as yf
 from stock_agent.config import Settings, get_settings
 
 
+def normalize_snapshot_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    """Coerce vendor values used by the UI to stable numeric columns."""
+    normalized = frame.copy()
+    for column in ("price", "previous_close", "market_cap"):
+        if column in normalized:
+            normalized[column] = pd.to_numeric(normalized[column], errors="coerce")
+    return normalized
+
+
 class YahooStockTool:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -54,4 +63,4 @@ class YahooStockTool:
                 rows.append(self.quote(ticker))
             except Exception as exc:  # one vendor failure must not break the dashboard
                 rows.append({"ticker": ticker, "error": str(exc)})
-        return pd.DataFrame(rows)
+        return normalize_snapshot_frame(pd.DataFrame(rows))

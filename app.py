@@ -1,6 +1,5 @@
 """Streamlit UI for the NASDAQ-10 multi-agent research application."""
 
-import pandas as pd
 import streamlit as st
 
 from stock_agent.config import get_settings
@@ -59,13 +58,24 @@ with tab_market:
     if st.button("Refresh NASDAQ-10 prices"):
         with st.spinner("Loading Yahoo Finance data…"):
             frame = YahooStockTool(settings).universe_snapshot()
-        if "price" in frame:
+        if not frame.empty:
             st.dataframe(
-                frame.style.format({"price": "${:,.2f}", "market_cap": "${:,.0f}"}),
-                use_container_width=True,
+                frame,
+                column_config={
+                    "price": st.column_config.NumberColumn("Price", format="$%.2f"),
+                    "previous_close": st.column_config.NumberColumn(
+                        "Previous close", format="$%.2f"
+                    ),
+                    "market_cap": st.column_config.NumberColumn(
+                        "Market cap", format="$%.0f"
+                    ),
+                },
+                width="stretch",
                 hide_index=True,
             )
-            chart_data = frame.dropna(subset=["price"]).set_index("ticker")[["price"]]
-            st.bar_chart(chart_data)
+            if "price" in frame:
+                chart_data = frame.dropna(subset=["price"]).set_index("ticker")[["price"]]
+                if not chart_data.empty:
+                    st.bar_chart(chart_data)
         else:
-            st.dataframe(pd.DataFrame(frame), use_container_width=True)
+            st.info("Yahoo Finance did not return any stock data.")

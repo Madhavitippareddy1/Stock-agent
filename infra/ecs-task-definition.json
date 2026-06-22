@@ -9,7 +9,7 @@
   "containerDefinitions": [
     {
       "name": "stock-agent",
-      "image": "666127452756.dkr.ecr.eu-west-2.amazonaws.com/stock-agent:cde2b39",
+      "image": "666127452756.dkr.ecr.eu-west-2.amazonaws.com/stock-agent:latest",
       "essential": true,
       "portMappings": [
         {
