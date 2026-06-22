@@ -5,6 +5,13 @@
 The application supports a configurable universe of ten large NASDAQ-listed
 stocks: NVDA, GOOGL, AAPL, MSFT, AMZN, META, AVGO, TSLA, COST, and NFLX.
 
+Development environment resource names:
+
+- ECS cluster: `dev-dsmay-stock-agent-cluster`
+- ECS service: `dev-dsmay-stock-agent-ecs`
+- ECR repository: `dev-dsmay-stock-agent-repo`
+- S3 reports bucket: `dev-dsmay-stock-agent-bucket`
+
 The request path is:
 
 1. The user chooses companies, enters text, and optionally uploads a PDF or
@@ -156,11 +163,10 @@ Secret:
 Variables:
 
 - `AWS_DEPLOY_ENABLED=true`
-- `AWS_REGION`
-- `ECR_REPOSITORY`
-- `ECS_CLUSTER`
-- `ECS_SERVICE`
-- `ECS_TASK_DEFINITION` (path to a checked-in deployable task definition)
+
+The region, ECR repository, ECS cluster/service, and checked-in task-definition
+path are declared in the workflow `env` section using the development resource
+names above.
 
 The workflow authenticates through GitHub OIDC, tests the code, builds the
 Docker image, pushes the commit-tagged image to ECR, renders the task

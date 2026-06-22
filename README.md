@@ -36,20 +36,23 @@ docker run --env-file .env -p 8501:8501 stock-agent
 GitHub Actions tests and builds the Docker image, pushes it to Amazon ECR,
 then deploys the image to Amazon ECS.
 
+Current development AWS resources:
+
+- ECS cluster: `dev-dsmay-stock-agent-cluster`
+- ECS service: `dev-dsmay-stock-agent-ecs`
+- ECR repository: `dev-dsmay-stock-agent-repo`
+- S3 reports bucket: `dev-dsmay-stock-agent-bucket`
+
 The test job runs on every push and pull request. AWS deployment is disabled
 until the following GitHub Actions configuration is added:
 
 - Repository variable `AWS_DEPLOY_ENABLED=true`
-- Repository variable `AWS_REGION`
-- Repository variable `ECR_REPOSITORY`
-- Repository variable `ECS_CLUSTER`
-- Repository variable `ECS_SERVICE`
-- Repository variable `ECS_TASK_DEFINITION`
 - Repository or `production` environment secret `AWS_ROLE_ARN`
 
-The IAM role must trust GitHub's OIDC provider and allow ECR push, ECS
-deployment, and `iam:PassRole`. Keep `AWS_DEPLOY_ENABLED` unset or `false`
-until the AWS infrastructure is ready.
+The AWS region and renamed ECR/ECS resources are defined in the workflow
+`env` section. The IAM role must trust GitHub's OIDC provider and allow ECR
+push, ECS deployment, and `iam:PassRole`. Keep `AWS_DEPLOY_ENABLED` unset or
+`false` until the AWS infrastructure is ready.
 
 See [docs/IMPLEMENTATION_GUIDE.md](docs/IMPLEMENTATION_GUIDE.md) for the full
 phase-by-phase implementation and deployment guide.
