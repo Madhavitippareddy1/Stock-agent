@@ -4,7 +4,7 @@ from stock_agent.supervisor import run_stock_research
 
 
 def main() -> None:
-    result = run_stock_research("Show AAPL stock price and recent news", selected_tickers=("AAPL",))
+    result = run_stock_research("Show the AAPL stock price", selected_tickers=("AAPL",))
     print(result.answer)
 
 

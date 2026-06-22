@@ -10,11 +10,10 @@ The request path is:
 1. The user chooses companies, enters text, and optionally uploads a PDF or
    text report in Streamlit.
 2. The Supervisor Agent detects whether the request needs report retrieval,
-   news, stock data, or a combination.
+   stock data, or a combination.
 3. The RAG Agent retrieves relevant passages from the upload and S3 reports.
-4. The News Agent calls NewsAPI.
-5. The Stock Data Agent calls Yahoo Finance through `yfinance`.
-6. Results and source links are returned to Streamlit.
+4. The Stock Data Agent calls Yahoo Finance through `yfinance`.
+5. Results and source links are returned to Streamlit.
 
 ## 2. Project structure
 
@@ -23,7 +22,7 @@ app.py                              Streamlit UI
 src/stock_agent/
   agents/                           Supervisor specialist agents
   services/                         Bedrock, S3, document and DB adapters
-  tools/                            Yahoo, NewsAPI and SEC EDGAR tools
+  tools/                            Yahoo stock-data and SEC EDGAR tools
   config.py                         Environment configuration
 infra/ecs-task-definition.json      ECS Fargate task template
 scripts/sync_sec_reports.py         SEC-to-S3 report synchronization
@@ -36,7 +35,6 @@ Dockerfile                          Production Streamlit image
 
 Install Python 3.12 and `uv`, copy `.env.example` to `.env`, then configure:
 
-- `NEWS_API_KEY`: key from NewsAPI.
 - `AWS_REGION`: region containing Bedrock, S3, ECR and ECS.
 - `REPORTS_BUCKET`: private S3 bucket for filings.
 - `SEC_USER_AGENT`: application name and monitored email address.
@@ -94,18 +92,12 @@ For larger production collections, replace lexical retrieval with OpenSearch
 Serverless or Aurora PostgreSQL/pgvector and persist Bedrock embeddings during
 the SEC synchronization phase.
 
-## 6. Phase 4 — Data APIs
+## 6. Phase 4 — Stock data API
 
 Yahoo Finance is accessed through the community `yfinance` library. It supplies
 quotes, history, annual statements and quarterly statements. This is suitable
 for prototypes; confirm licensing and use a contracted market-data vendor for
 commercial or latency-sensitive production use.
-
-NewsAPI uses `/v2/everything`, a 14-day lookback, English results and newest
-articles first. Store the key in AWS Secrets Manager, never in Git.
-
-When `NEWS_API_KEY` is not configured, the News Agent automatically falls back
-to Yahoo Finance company news so research requests remain functional.
 
 ## 7. Phase 5 — Tests
 
@@ -118,18 +110,17 @@ docker build -t stock-agent:test .
 ```
 
 Tests mock network and AWS boundaries. They cover supervisor routing, document
-extraction/chunking, RAG retrieval, News Agent formatting, Yahoo ticker
-validation, S3 keys, SEC filing classification, and Stock Agent output.
+extraction/chunking, RAG retrieval, Yahoo ticker validation, S3 keys, SEC
+filing classification, and Stock Agent output.
 
 ## 8. Phase 6 — Docker, ECR and ECS
 
 1. Create ECR repository `stock-agent`.
 2. Create ECS cluster and Fargate service behind an Application Load Balancer.
 3. Create `/ecs/stock-agent` CloudWatch log group.
-4. Store NewsAPI key in Secrets Manager.
-5. Create ECS execution and task IAM roles.
-6. Register a task definition based on `infra/ecs-task-definition.json`.
-7. Set health-check path to `/_stcore/health` on port 8501.
+4. Create ECS execution and task IAM roles.
+5. Register a task definition based on `infra/ecs-task-definition.json`.
+6. Set health-check path to `/_stcore/health` on port 8501.
 
 The image runs as a non-root user and exposes port 8501.
 

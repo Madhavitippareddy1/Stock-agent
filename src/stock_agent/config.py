@@ -23,7 +23,6 @@ class Settings(BaseSettings):
     bedrock_embedding_model_id: str = "amazon.titan-embed-text-v2:0"
     reports_bucket: str = ""
     reports_prefix: str = "financial-reports"
-    news_api_key: str = ""
     sec_user_agent: str = "StockAgent/0.1 contact@example.com"
     database_url: str = ""
     log_level: str = "INFO"

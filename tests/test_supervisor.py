@@ -20,7 +20,6 @@ def test_extract_tickers_returns_selected_symbols() -> None:
 def test_supervisor_routes_price_request_to_stock_agent() -> None:
     supervisor = SupervisorAgent(
         rag_agent=FakeAgent("RAG"),
-        news_agent=FakeAgent("News"),
         stock_agent=FakeAgent("Stock"),
     )
     result = supervisor.run("What is the AAPL stock price?", selected_tickers=("AAPL",))

@@ -1,17 +1,16 @@
 # NASDAQ-10 Stock AI Agent
 
 A production-oriented multi-agent stock research application built with
-Streamlit, Yahoo Finance, NewsAPI, SEC EDGAR, Amazon S3, Amazon Bedrock,
+Streamlit, Yahoo Finance, SEC EDGAR, Amazon S3, Amazon Bedrock,
 Docker, Amazon ECR, and Amazon ECS Fargate.
 
 ## Main flow
 
-`End user → Streamlit → Supervisor → RAG / News / Stock agents → Output`
+`End user → Streamlit → Supervisor → RAG / Stock agents → Output`
 
 Specialist agents:
 
 - RAG Agent searches uploaded PDF/text files and financial reports in S3.
-- News Agent queries NewsAPI for recent company coverage.
 - Stock Data Agent queries Yahoo Finance for prices and financial statements.
 - Supervisor Agent selects the appropriate tools and combines responses.
 

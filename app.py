@@ -12,7 +12,7 @@ settings = get_settings()
 
 st.title("NASDAQ-10 AI Stock Research")
 st.caption(
-    "Research prices, news, and financial reports with specialist agents. "
+    "Research prices and financial reports with specialist agents. "
     "For informational purposes only—not investment advice."
 )
 
@@ -24,7 +24,7 @@ with st.sidebar:
         default=list(settings.tickers[:3]),
     )
     st.markdown("**Available agents**")
-    st.write("Supervisor · RAG · News · Stock Data")
+    st.write("Supervisor · RAG · Stock Data")
     if not settings.reports_bucket:
         st.info("Set REPORTS_BUCKET to enable S3 financial-report retrieval.")
 
@@ -37,7 +37,7 @@ with tab_research:
     )
     question = st.text_area(
         "Question",
-        placeholder="Compare NVDA and MSFT prices, recent news, and revenue risks.",
+        placeholder="Compare NVDA and MSFT prices and revenue risks.",
         height=110,
     )
     if st.button("Run research", type="primary", disabled=not question.strip()):

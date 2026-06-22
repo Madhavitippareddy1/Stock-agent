@@ -5,7 +5,6 @@ from typing import Any
 
 class AgentName(StrEnum):
     RAG = "rag"
-    NEWS = "news"
     STOCK = "stock"
 
 

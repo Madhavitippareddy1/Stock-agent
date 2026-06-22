@@ -1,6 +1,5 @@
 import re
 
-from stock_agent.agents.news_agent import NewsAgent
 from stock_agent.agents.rag_agent import RagAgent
 from stock_agent.agents.stock_agent import StockDataAgent
 from stock_agent.config import Settings, get_settings
@@ -18,12 +17,10 @@ class SupervisorAgent:
         self,
         settings: Settings | None = None,
         rag_agent: RagAgent | None = None,
-        news_agent: NewsAgent | None = None,
         stock_agent: StockDataAgent | None = None,
     ) -> None:
         self.settings = settings or get_settings()
         self.rag_agent = rag_agent or RagAgent()
-        self.news_agent = news_agent or NewsAgent()
         self.stock_agent = stock_agent or StockDataAgent()
 
     def route(self, question: str, has_document: bool) -> tuple[str, ...]:
@@ -31,11 +28,9 @@ class SupervisorAgent:
         routes = []
         if has_document or any(word in lowered for word in ("report", "revenue", "filing", "10-k", "10-q")):
             routes.append("rag")
-        if any(word in lowered for word in ("news", "headline", "event", "announcement")):
-            routes.append("news")
         if any(word in lowered for word in ("price", "stock", "market", "quote", "performance")):
             routes.append("stock")
-        return tuple(routes or ("rag", "news", "stock"))
+        return tuple(routes or ("rag", "stock"))
 
     def run(
         self,
@@ -54,8 +49,6 @@ class SupervisorAgent:
                             question, tickers, uploaded_content, uploaded_content_type
                         )
                     )
-                elif route == "news":
-                    sections.append(self.news_agent.run(tickers))
                 elif route == "stock":
                     sections.append(self.stock_agent.run(tickers))
             except Exception as exc:
