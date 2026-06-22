@@ -42,6 +42,8 @@ class YahooStockTool:
             "annual_income": stock.financials,
             "quarterly_income": stock.quarterly_financials,
             "annual_balance_sheet": stock.balance_sheet,
+            "quarterly_balance_sheet": stock.quarterly_balance_sheet,
+            "annual_cashflow": stock.cashflow,
             "quarterly_cashflow": stock.quarterly_cashflow,
         }
 

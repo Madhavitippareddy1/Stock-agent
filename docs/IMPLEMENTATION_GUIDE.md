@@ -61,6 +61,13 @@ Synchronize recent official 10-K and 10-Q filings:
 uv run python scripts/sync_sec_reports.py
 ```
 
+If SEC endpoints are unavailable from the execution network, generate
+structured annual, quarterly, and half-yearly financial reports from Yahoo:
+
+```bash
+uv run python scripts/sync_yahoo_reports.py
+```
+
 Objects use this structure:
 
 ```text

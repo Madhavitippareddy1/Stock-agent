@@ -4,12 +4,12 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "1024",
   "memory": "2048",
-  "executionRoleArn": "ECS_EXECUTION_ROLE_ARN",
-  "taskRoleArn": "ECS_TASK_ROLE_ARN",
+  "executionRoleArn": "arn:aws:iam::666127452756:role/stock-agent-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::666127452756:role/stock-agent-ecs-task-role",
   "containerDefinitions": [
     {
       "name": "stock-agent",
-      "image": "ECR_IMAGE_URI",
+      "image": "666127452756.dkr.ecr.eu-west-2.amazonaws.com/stock-agent:cde2b39",
       "essential": true,
       "portMappings": [
         {
@@ -22,14 +22,10 @@
         {"name": "AWS_REGION", "value": "eu-west-2"},
         {"name": "BEDROCK_MODEL_ID", "value": "amazon.nova-lite-v1:0"},
         {"name": "BEDROCK_EMBEDDING_MODEL_ID", "value": "amazon.titan-embed-text-v2:0"},
-        {"name": "REPORTS_BUCKET", "value": "REPORTS_BUCKET_VALUE"},
-        {"name": "REPORTS_PREFIX", "value": "financial-reports"}
-      ],
-      "secrets": [
-        {
-          "name": "NEWS_API_KEY",
-          "valueFrom": "NEWS_API_SECRET_ARN"
-        }
+        {"name": "REPORTS_BUCKET", "value": "stock-agent-reports-666127452756-eu-west-2"},
+        {"name": "REPORTS_PREFIX", "value": "financial-reports"},
+        {"name": "SEC_USER_AGENT", "value": "StockAgent/0.1 madhavitippareddy1@example.com"},
+        {"name": "STOCK_UNIVERSE", "value": "NVDA,GOOGL,AAPL,MSFT,AMZN,META,AVGO,TSLA,COST,NFLX"}
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
