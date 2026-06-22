@@ -15,6 +15,14 @@ def normalize_snapshot_frame(frame: pd.DataFrame) -> pd.DataFrame:
     return normalized
 
 
+def first_value(values: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        value = values.get(key)
+        if value is not None:
+            return value
+    return None
+
+
 class YahooStockTool:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -32,11 +40,28 @@ class YahooStockTool:
         symbol = self.validate_ticker(ticker)
         stock = yf.Ticker(symbol)
         fast = dict(stock.fast_info)
+        price = first_value(fast, "lastPrice", "last_price")
+        previous_close = first_value(
+            fast,
+            "previousClose",
+            "previous_close",
+            "regularMarketPreviousClose",
+        )
+        market_cap = first_value(fast, "marketCap", "market_cap")
+
+        if price is None or previous_close is None:
+            history = stock.history(period="5d", auto_adjust=False)
+            closes = history["Close"].dropna() if "Close" in history else pd.Series(dtype=float)
+            if price is None and not closes.empty:
+                price = float(closes.iloc[-1])
+            if previous_close is None and len(closes) > 1:
+                previous_close = float(closes.iloc[-2])
+
         return {
             "ticker": symbol,
-            "price": fast.get("last_price"),
-            "previous_close": fast.get("previous_close"),
-            "market_cap": fast.get("market_cap"),
+            "price": price,
+            "previous_close": previous_close,
+            "market_cap": market_cap,
             "currency": fast.get("currency", "USD"),
         }
 

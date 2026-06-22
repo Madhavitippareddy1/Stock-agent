@@ -2,7 +2,11 @@ import pandas as pd
 
 from stock_agent.agents.stock_agent import StockDataAgent
 from stock_agent.config import Settings
-from stock_agent.tools.stock_data import YahooStockTool, normalize_snapshot_frame
+from stock_agent.tools.stock_data import (
+    YahooStockTool,
+    first_value,
+    normalize_snapshot_frame,
+)
 
 
 class FakeStockTool:
@@ -37,3 +41,14 @@ def test_snapshot_normalization_handles_error_and_missing_rows() -> None:
     assert pd.isna(normalized.loc[1, "price"])
     assert pd.isna(normalized.loc[2, "price"])
     assert pd.isna(normalized.loc[2, "market_cap"])
+
+
+def test_first_value_supports_yfinance_camel_case_fields() -> None:
+    fast_info = {
+        "lastPrice": 298.01,
+        "previousClose": 297.20,
+        "marketCap": 4_376_979_104_991,
+    }
+    assert first_value(fast_info, "lastPrice", "last_price") == 298.01
+    assert first_value(fast_info, "previousClose", "previous_close") == 297.20
+    assert first_value(fast_info, "marketCap", "market_cap") == 4_376_979_104_991
