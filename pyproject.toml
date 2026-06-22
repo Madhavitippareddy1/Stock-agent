@@ -5,21 +5,20 @@ description = "Multi-agent stock research application using Streamlit, RAG, and 
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "beautifulsoup4>=4.13",
     "boto3>=1.38",
-    "langchain>=0.3",
-    "langchain-aws>=0.2",
-    "langgraph>=0.4",
     "pandas>=2.2",
     "pydantic-settings>=2.9",
-    "psycopg[binary]>=3.2",
     "pypdf>=5.5",
     "requests>=2.32",
     "streamlit>=1.45",
+    "yfinance>=0.2.65",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.3",
+    "pytest-cov>=6.1",
     "ruff>=0.11",
 ]
 

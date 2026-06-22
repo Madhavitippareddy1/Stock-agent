@@ -2,7 +2,7 @@ name: CI/CD
 
 on:
   push:
-    branches: [main]
+    branches: [main, Madhavi]
   pull_request:
 
 permissions:
@@ -19,12 +19,13 @@ jobs:
           python-version: "3.12"
       - run: uv sync --dev
       - run: uv run ruff check .
-      - run: uv run pytest
+      - run: uv run pytest --cov=stock_agent --cov-report=term-missing
+      - run: docker build -t stock-agent:test .
 
   build-and-deploy:
     if: >-
-      github.ref == 'refs/heads/main' &&
       github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
       vars.AWS_DEPLOY_ENABLED == 'true'
     needs: test
     runs-on: ubuntu-latest
@@ -36,31 +37,38 @@ jobs:
           AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
           AWS_REGION: ${{ vars.AWS_REGION }}
           ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-          EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+          ECS_SERVICE: ${{ vars.ECS_SERVICE }}
         run: |
-          test -n "$AWS_ROLE_ARN" || { echo "::error::Missing AWS_ROLE_ARN secret"; exit 1; }
-          test -n "$AWS_REGION" || { echo "::error::Missing AWS_REGION variable"; exit 1; }
-          test -n "$ECR_REPOSITORY" || { echo "::error::Missing ECR_REPOSITORY variable"; exit 1; }
-          test -n "$EC2_INSTANCE_ID" || { echo "::error::Missing EC2_INSTANCE_ID variable"; exit 1; }
+          for name in AWS_ROLE_ARN AWS_REGION ECR_REPOSITORY ECS_CLUSTER ECS_SERVICE; do
+            test -n "${!name}" || { echo "::error::Missing $name"; exit 1; }
+          done
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
       - uses: aws-actions/amazon-ecr-login@v2
         id: ecr
-      - name: Build and push image
+      - name: Build and push Docker image
+        id: image
         env:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
           REPOSITORY: ${{ vars.ECR_REPOSITORY }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" .
-          docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
-          docker tag "$REGISTRY/$REPOSITORY:$IMAGE_TAG" "$REGISTRY/$REPOSITORY:latest"
-          docker push "$REGISTRY/$REPOSITORY:latest"
-      - name: Trigger EC2 deployment
-        run: |
-          aws ssm send-command \
-            --instance-ids "${{ vars.EC2_INSTANCE_ID }}" \
-            --document-name "AWS-RunShellScript" \
-            --parameters commands="cd /opt/stock-agent && ./deploy.sh"
+          IMAGE="$REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "uri=$IMAGE" >> "$GITHUB_OUTPUT"
+      - uses: aws-actions/amazon-ecs-render-task-definition@v1
+        id: task
+        with:
+          task-definition: ${{ vars.ECS_TASK_DEFINITION }}
+          container-name: stock-agent
+          image: ${{ steps.image.outputs.uri }}
+      - uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task.outputs.task-definition }}
+          service: ${{ vars.ECS_SERVICE }}
+          cluster: ${{ vars.ECS_CLUSTER }}
+          wait-for-service-stability: true
