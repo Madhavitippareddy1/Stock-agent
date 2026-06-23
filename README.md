@@ -56,3 +56,13 @@ push, ECS deployment, and `iam:PassRole`. Keep `AWS_DEPLOY_ENABLED` unset or
 
 See [docs/IMPLEMENTATION_GUIDE.md](docs/IMPLEMENTATION_GUIDE.md) for the full
 phase-by-phase implementation and deployment guide.
+
+## Langfuse observability
+
+Optional Langfuse tracing is available for supervisor routing, RAG retrieval,
+Amazon Bedrock model calls, token usage, Yahoo Finance tools, latency, and
+errors. It is disabled by default and does not capture report content unless
+explicitly enabled.
+
+See [docs/LANGFUSE_SETUP.md](docs/LANGFUSE_SETUP.md) for local configuration,
+AWS Secrets Manager, ECS, and privacy instructions.

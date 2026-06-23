@@ -28,7 +28,22 @@
         {"name": "REPORTS_BUCKET", "value": "dev-dsmay-stock-agent-bucket"},
         {"name": "REPORTS_PREFIX", "value": "financial-reports"},
         {"name": "SEC_USER_AGENT", "value": "StockAgent/0.1 madhavitippareddy1@example.com"},
-        {"name": "STOCK_UNIVERSE", "value": "NVDA,GOOGL,AAPL,MSFT,AMZN,META,AVGO,TSLA,COST,NFLX"}
+        {"name": "STOCK_UNIVERSE", "value": "NVDA,GOOGL,AAPL,MSFT,AMZN,META,AVGO,TSLA,COST,NFLX"},
+        {"name": "LANGFUSE_ENABLED", "value": "true"},
+        {"name": "LANGFUSE_BASE_URL", "value": "https://cloud.langfuse.com"},
+        {"name": "LANGFUSE_ENVIRONMENT", "value": "production"},
+        {"name": "LANGFUSE_CAPTURE_CONTENT", "value": "false"},
+        {"name": "LANGFUSE_SAMPLE_RATE", "value": "1.0"}
+      ],
+      "secrets": [
+        {
+          "name": "LANGFUSE_PUBLIC_KEY",
+          "valueFrom": "arn:aws:secretsmanager:eu-west-2:666127452756:secret:dev/dsmay/stock-agent/langfuse-yR9JUe:public_key::"
+        },
+        {
+          "name": "LANGFUSE_SECRET_KEY",
+          "valueFrom": "arn:aws:secretsmanager:eu-west-2:666127452756:secret:dev/dsmay/stock-agent/langfuse-yR9JUe:secret_key::"
+        }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",

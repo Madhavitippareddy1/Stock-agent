@@ -46,6 +46,7 @@ with tab_research:
                 question=question,
                 uploaded_content=uploaded_file.getvalue() if uploaded_file else None,
                 uploaded_content_type=uploaded_file.type if uploaded_file else "text/plain",
+                uploaded_filename=uploaded_file.name if uploaded_file else "",
                 selected_tickers=tuple(selected) or settings.tickers,
             )
         st.markdown(result.answer)
