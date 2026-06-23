@@ -1,16 +1,37 @@
 from stock_agent.models import AgentResult
+from stock_agent.observability import Observability, get_observability
 from stock_agent.tools.stock_data import YahooStockTool
 
 
 class StockDataAgent:
-    def __init__(self, tool: YahooStockTool | None = None) -> None:
+    def __init__(
+        self,
+        tool: YahooStockTool | None = None,
+        observability: Observability | None = None,
+    ) -> None:
         self.tool = tool or YahooStockTool()
+        self.observability = observability or get_observability()
 
     def run(self, tickers: tuple[str, ...]) -> AgentResult:
         quotes = []
         for ticker in tickers:
             try:
-                quotes.append(self.tool.quote(ticker))
+                with self.observability.observe(
+                    "yahoo-finance-quote",
+                    as_type="tool",
+                    input={"ticker": ticker},
+                ) as tool_span:
+                    quote = self.tool.quote(ticker)
+                    quotes.append(quote)
+                    if tool_span:
+                        tool_span.update(
+                            output={
+                                "ticker": ticker,
+                                "price_available": isinstance(
+                                    quote.get("price"), (int, float)
+                                ),
+                            }
+                        )
             except Exception as exc:
                 quotes.append({"ticker": ticker, "error": str(exc)})
         rows = []

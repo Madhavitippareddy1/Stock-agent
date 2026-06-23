@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     database_url: str = ""
     log_level: str = "INFO"
     stock_universe: str = ",".join(NASDAQ_10)
+    langfuse_enabled: bool = False
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_base_url: str = "https://cloud.langfuse.com"
+    langfuse_environment: str = "development"
+    langfuse_release: str = ""
+    langfuse_capture_content: bool = False
+    langfuse_sample_rate: float = 1.0
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

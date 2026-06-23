@@ -2,6 +2,7 @@ import re
 from collections import Counter
 
 from stock_agent.models import AgentResult
+from stock_agent.observability import Observability, get_observability
 from stock_agent.services.bedrock_service import BedrockService
 from stock_agent.services.document_service import chunk_text, extract_text
 from stock_agent.services.s3_reports import S3ReportRepository
@@ -35,10 +36,12 @@ class RagAgent:
         reports: S3ReportRepository | None = None,
         bedrock: BedrockService | None = None,
         vector_store: OpenSearchVectorStore | None = None,
+        observability: Observability | None = None,
     ) -> None:
         self.reports = reports
         self.bedrock = bedrock
         self.vector_store = vector_store
+        self.observability = observability or get_observability()
 
     def run(
         self,
@@ -53,7 +56,43 @@ class RagAgent:
                 ("Uploaded document", extract_text(uploaded_content, uploaded_content_type))
             )
         elif self.vector_store and self.bedrock:
-            matches = self.vector_store.search(self.bedrock.embed(question), tickers)
+            bedrock_settings = getattr(self.bedrock, "settings", None)
+            embedding_model = getattr(
+                bedrock_settings,
+                "bedrock_embedding_model_id",
+                "amazon.titan-embed-text-v2:0",
+            )
+            embedding_dimension = getattr(bedrock_settings, "embedding_dimension", 1024)
+            with self.observability.observe(
+                "embed-rag-question",
+                as_type="embedding",
+                input=self.observability.content(
+                    question,
+                    {"text_length": len(question)},
+                ),
+                model=embedding_model,
+                metadata={"dimensions": embedding_dimension},
+            ) as embedding_span:
+                embedding = self.bedrock.embed(question)
+                if embedding_span:
+                    embedding_span.update(
+                        output={"dimensions": len(embedding)},
+                        usage_details={"input": len(question)},
+                    )
+            with self.observability.observe(
+                "retrieve-financial-report-chunks",
+                as_type="retriever",
+                input={"tickers": tickers, "limit": 6},
+            ) as retrieval_span:
+                matches = self.vector_store.search(embedding, tickers)
+                if retrieval_span:
+                    retrieval_span.update(
+                        output={
+                            "match_count": len(matches),
+                            "sources": list(dict.fromkeys(match.source for match in matches)),
+                            "scores": [match.score for match in matches],
+                        }
+                    )
             if not matches:
                 return AgentResult(
                     agent="RAG Agent",

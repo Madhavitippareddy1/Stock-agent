@@ -4,6 +4,7 @@ from stock_agent.agents.rag_agent import RagAgent
 from stock_agent.agents.stock_agent import StockDataAgent
 from stock_agent.config import Settings, get_settings
 from stock_agent.models import AgentResult, ResearchResult
+from stock_agent.observability import Observability, get_observability
 
 
 def find_tickers(value: str, allowed: tuple[str, ...]) -> tuple[str, ...]:
@@ -60,10 +61,12 @@ class SupervisorAgent:
         settings: Settings | None = None,
         rag_agent: RagAgent | None = None,
         stock_agent: StockDataAgent | None = None,
+        observability: Observability | None = None,
     ) -> None:
         self.settings = settings or get_settings()
         self.rag_agent = rag_agent or RagAgent()
         self.stock_agent = stock_agent or StockDataAgent()
+        self.observability = observability or get_observability()
 
     def route(self, question: str, has_document: bool) -> tuple[str, ...]:
         lowered = question.lower()
@@ -98,27 +101,60 @@ class SupervisorAgent:
             or selected_tickers
             or self.settings.tickers
         )
-        sections: list[AgentResult] = []
-        for route in routes:
-            try:
-                if route == "rag":
+        trace_input = self.observability.content(
+            {"question": question},
+            {"question_length": len(question)},
+        )
+        with self.observability.observe(
+            "stock-agent-research",
+            as_type="agent",
+            input=trace_input,
+            metadata={
+                "routes": routes,
+                "tickers": tickers,
+                "has_document": uploaded_content is not None,
+                "uploaded_content_type": uploaded_content_type if uploaded_content else None,
+            },
+        ) as trace:
+            sections: list[AgentResult] = []
+            for route in routes:
+                try:
+                    with self.observability.observe(
+                        f"{route}-agent",
+                        as_type="agent",
+                        metadata={"route": route, "tickers": tickers},
+                    ) as agent_span:
+                        if route == "rag":
+                            result = self.rag_agent.run(
+                                question, tickers, uploaded_content, uploaded_content_type
+                            )
+                        else:
+                            result = self.stock_agent.run(tickers)
+                        sections.append(result)
+                        if agent_span:
+                            agent_span.update(
+                                output={
+                                    "agent": result.agent,
+                                    "source_count": len(result.sources),
+                                }
+                            )
+                except Exception as exc:
                     sections.append(
-                        self.rag_agent.run(
-                            question, tickers, uploaded_content, uploaded_content_type
+                        AgentResult(
+                            agent=f"{route.title()} Agent",
+                            answer=f"Service unavailable: {exc}",
                         )
                     )
-                elif route == "stock":
-                    sections.append(self.stock_agent.run(tickers))
-            except Exception as exc:
-                sections.append(
-                    AgentResult(
-                        agent=f"{route.title()} Agent",
-                        answer=f"Service unavailable: {exc}",
-                    )
+            answer = "\n\n".join(f"### {item.agent}\n{item.answer}" for item in sections)
+            sources = list(dict.fromkeys(source for item in sections for source in item.sources))
+            if trace:
+                trace.update(
+                    output={
+                        "agents": [item.agent for item in sections],
+                        "source_count": len(sources),
+                    }
                 )
-        answer = "\n\n".join(f"### {item.agent}\n{item.answer}" for item in sections)
-        sources = list(dict.fromkeys(source for item in sections for source in item.sources))
-        return ResearchResult(answer=answer, sections=sections, sources=sources)
+            return ResearchResult(answer=answer, sections=sections, sources=sources)
 
 
 def build_supervisor(settings: Settings | None = None) -> SupervisorAgent:
