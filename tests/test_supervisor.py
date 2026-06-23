@@ -68,6 +68,8 @@ class TickerCaptureAgent:
             return ("CSX",)
         if "PepsiCo" in question:
             return ("PEP",)
+        if "apple" in question.lower() and "meta" in question.lower():
+            return ("AAPL", "META")
         if "nvdia" in question and "amzon" in question:
             return ("NVDA", "AMZN")
         return ()
@@ -177,6 +179,23 @@ def test_pepsico_buying_question_uses_only_pep() -> None:
 
     assert [section.agent for section in result.sections] == ["Stock"]
     assert stock_agent.tickers == ("PEP",)
+
+
+def test_company_name_and_ticker_like_name_are_merged_for_comparison() -> None:
+    stock_agent = TickerCaptureAgent()
+    rag_agent = RagTickerCaptureAgent()
+    supervisor = SupervisorAgent(
+        rag_agent=rag_agent,
+        stock_agent=stock_agent,
+    )
+
+    result = supervisor.run(
+        "compare apple and meta stocks",
+        selected_tickers=("NVDA", "GOOGL", "AAPL", "META"),
+    )
+
+    assert [section.agent for section in result.sections] == ["Stock"]
+    assert stock_agent.tickers == ("AAPL", "META")
 
 
 def test_unresolved_stock_question_does_not_fall_back_to_top_ten() -> None:

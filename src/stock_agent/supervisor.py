@@ -16,6 +16,16 @@ def extract_tickers(question: str, allowed: tuple[str, ...]) -> tuple[str, ...]:
     return find_tickers(question, allowed) or allowed
 
 
+def merge_tickers(*ticker_groups: tuple[str, ...]) -> tuple[str, ...]:
+    merged = []
+    for group in ticker_groups:
+        for ticker in group:
+            normalized = ticker.upper()
+            if normalized not in merged:
+                merged.append(normalized)
+    return tuple(merged)
+
+
 def _requests_live_stock_data(question: str, has_document: bool) -> bool:
     lowered = question.lower()
     if has_document:
@@ -116,12 +126,13 @@ class SupervisorAgent:
     ) -> ResearchResult:
         routes = self.route(question, uploaded_content is not None)
         question_tickers = find_tickers(question, self.settings.tickers)
-        tickers = question_tickers
-        if "stock" in routes and not question_tickers:
+        resolved_tickers = ()
+        if "stock" in routes:
             try:
-                tickers = self.stock_agent.resolve_tickers(question)
+                resolved_tickers = self.stock_agent.resolve_tickers(question)
             except (AttributeError, ValueError):
-                tickers = ()
+                resolved_tickers = ()
+        tickers = merge_tickers(resolved_tickers, question_tickers)
         document_tickers = find_tickers(uploaded_filename, self.settings.tickers)
         if not tickers:
             if uploaded_content is not None:
