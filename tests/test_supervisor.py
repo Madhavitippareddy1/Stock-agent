@@ -66,6 +66,8 @@ class TickerCaptureAgent:
             return ("CSCO",)
         if "CSX Corporation" in question:
             return ("CSX",)
+        if "PepsiCo" in question:
+            return ("PEP",)
         if "nvdia" in question and "amzon" in question:
             return ("NVDA", "AMZN")
         return ()
@@ -159,3 +161,34 @@ def test_full_company_name_price_request_uses_one_resolved_symbol() -> None:
 
     assert [section.agent for section in result.sections] == ["Stock"]
     assert stock_agent.tickers == ("CSX",)
+
+
+def test_pepsico_buying_question_uses_only_pep() -> None:
+    stock_agent = TickerCaptureAgent()
+    supervisor = SupervisorAgent(
+        rag_agent=FakeAgent("RAG"),
+        stock_agent=stock_agent,
+    )
+
+    result = supervisor.run(
+        "is buying PepsiCo shares right time or not",
+        selected_tickers=("NVDA", "GOOGL", "AAPL"),
+    )
+
+    assert [section.agent for section in result.sections] == ["Stock"]
+    assert stock_agent.tickers == ("PEP",)
+
+
+def test_unresolved_stock_question_does_not_fall_back_to_top_ten() -> None:
+    stock_agent = TickerCaptureAgent()
+    supervisor = SupervisorAgent(
+        rag_agent=FakeAgent("RAG"),
+        stock_agent=stock_agent,
+    )
+
+    supervisor.run(
+        "Should I buy an unknown company stock?",
+        selected_tickers=("NVDA", "GOOGL", "AAPL"),
+    )
+
+    assert stock_agent.tickers == ()

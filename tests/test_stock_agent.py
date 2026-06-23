@@ -126,6 +126,20 @@ def test_company_alias_resolves_cisco_without_vendor_search(monkeypatch) -> None
     )
 
 
+def test_investment_style_pepsico_question_resolves_one_symbol(monkeypatch) -> None:
+    monkeypatch.setattr("stock_agent.tools.stock_data.yf.Search", FakeSearch)
+    assert YahooStockTool().search_symbols(
+        "is buying PepsiCo shares right time or not",
+        limit=5,
+    ) == ("PEP",)
+
+
+def test_empty_stock_scope_does_not_render_default_stocks() -> None:
+    result = StockDataAgent(FakeStockTool()).run(())
+    assert "could not identify" in result.answer
+    assert "AAPL" not in result.answer
+
+
 def test_multiple_misspelled_company_names_resolve_in_question_order() -> None:
     assert resolve_alias_symbols("compare nvdia with amzon") == ("NVDA", "AMZN")
 

@@ -15,6 +15,16 @@ class StockDataAgent:
         self.observability = observability or get_observability()
 
     def run(self, tickers: tuple[str, ...]) -> AgentResult:
+        if not tickers:
+            return AgentResult(
+                agent="Stock Data Agent",
+                answer=(
+                    "I could not identify the requested company or ticker. "
+                    "Please enter a company name such as PepsiCo or a symbol such as PEP."
+                ),
+                sources=["Yahoo Finance"],
+                data={"quotes": []},
+            )
         quotes = []
         for ticker in tickers:
             try:

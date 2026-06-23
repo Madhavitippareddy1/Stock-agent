@@ -24,10 +24,14 @@ def _requests_live_stock_data(question: str, has_document: bool) -> bool:
             for phrase in (
                 "price",
                 "quote",
+                "buy",
+                "buying",
                 "market price",
                 "current market",
                 "current stock",
                 "performance",
+                "share",
+                "shares",
                 "recent",
                 "update",
                 "news",
@@ -41,7 +45,11 @@ def _requests_live_stock_data(question: str, has_document: bool) -> bool:
         word in lowered
         for word in (
             "price",
+            "buy",
+            "buying",
             "stock",
+            "share",
+            "shares",
             "market",
             "quote",
             "performance",
@@ -114,12 +122,12 @@ class SupervisorAgent:
                 tickers = self.stock_agent.resolve_tickers(question)
             except (AttributeError, ValueError):
                 tickers = ()
-        tickers = (
-            tickers
-            or find_tickers(uploaded_filename, self.settings.tickers)
-            or selected_tickers
-            or self.settings.tickers
-        )
+        document_tickers = find_tickers(uploaded_filename, self.settings.tickers)
+        if not tickers:
+            if uploaded_content is not None:
+                tickers = document_tickers or selected_tickers or ()
+            elif "stock" not in routes:
+                tickers = selected_tickers or self.settings.tickers
         trace_input = self.observability.content(
             {"question": question},
             {"question_length": len(question)},
