@@ -52,9 +52,24 @@ class RagAgent:
     ) -> AgentResult:
         documents: list[tuple[str, str]] = []
         if uploaded_content:
-            documents.append(
-                ("Uploaded document", extract_text(uploaded_content, uploaded_content_type))
-            )
+            with self.observability.observe(
+                "extract-uploaded-financial-report",
+                as_type="tool",
+                input={
+                    "content_type": uploaded_content_type,
+                    "uploaded_bytes": len(uploaded_content),
+                },
+                metadata={"tool": "document-text-extraction"},
+            ) as extraction_span:
+                uploaded_text = extract_text(uploaded_content, uploaded_content_type)
+                documents.append(("Uploaded document", uploaded_text))
+                if extraction_span:
+                    extraction_span.update(
+                        output={
+                            "source": "Uploaded document",
+                            "text_length": len(uploaded_text),
+                        }
+                    )
         elif self.vector_store and self.bedrock:
             bedrock_settings = getattr(self.bedrock, "settings", None)
             embedding_model = getattr(
@@ -130,23 +145,106 @@ class RagAgent:
                 sources=list(dict.fromkeys(match.source for match in matches)),
             )
         elif self.reports:
-            for report in self.reports.list_reports(tickers):
-                content, content_type = self.reports.download(report.key)
-                documents.append(
-                    (
-                        f"s3://{self.reports.settings.reports_bucket}/{report.key}",
-                        extract_text(content, content_type),
+            with self.observability.observe(
+                "s3-list-financial-reports",
+                as_type="tool",
+                input={
+                    "bucket": self.reports.settings.reports_bucket,
+                    "prefix": self.reports.settings.reports_prefix,
+                    "tickers": tickers,
+                },
+                metadata={"provider": "Amazon S3"},
+            ) as s3_list_span:
+                reports = self.reports.list_reports(tickers)
+                if s3_list_span:
+                    s3_list_span.update(
+                        output={
+                            "report_count": len(reports),
+                            "reports": [
+                                {
+                                    "ticker": report.ticker,
+                                    "period": report.period,
+                                    "year": report.year,
+                                    "key": report.key,
+                                }
+                                for report in reports
+                            ],
+                        }
                     )
-                )
+            for report in reports:
+                source = f"s3://{self.reports.settings.reports_bucket}/{report.key}"
+                with self.observability.observe(
+                    "s3-download-financial-report",
+                    as_type="tool",
+                    input={
+                        "bucket": self.reports.settings.reports_bucket,
+                        "key": report.key,
+                        "ticker": report.ticker,
+                        "period": report.period,
+                        "year": report.year,
+                    },
+                    metadata={"provider": "Amazon S3"},
+                ) as s3_download_span:
+                    content, content_type = self.reports.download(report.key)
+                    text = extract_text(content, content_type)
+                    documents.append((source, text))
+                    if s3_download_span:
+                        s3_download_span.update(
+                            output={
+                                "source": source,
+                                "content_type": content_type,
+                                "content_bytes": len(content),
+                                "text_length": len(text),
+                            }
+                        )
 
-        chunks = [
-            (source, chunk)
-            for source, text in documents
-            for chunk in chunk_text(text)
-        ]
-        matches = _retrieve(question, chunks)
+        with self.observability.observe(
+            "chunk-financial-report-documents",
+            as_type="span",
+            input={
+                "document_count": len(documents),
+                "sources": [source for source, _ in documents],
+            },
+            metadata={"chunk_size": 1400, "chunk_overlap": 200},
+        ) as chunk_span:
+            chunks = [
+                (source, chunk)
+                for source, text in documents
+                for chunk in chunk_text(text)
+            ]
+            if chunk_span:
+                chunk_span.update(
+                    output={
+                        "chunk_count": len(chunks),
+                        "sources": list(dict.fromkeys(source for source, _ in chunks)),
+                    }
+                )
+        with self.observability.observe(
+            "keyword-retrieve-financial-report-chunks",
+            as_type="retriever",
+            input={
+                "chunk_count": len(chunks),
+                "limit": 6,
+                **self.observability.safe_text(question, label="question"),
+            },
+        ) as keyword_retrieval_span:
+            matches = _retrieve(question, chunks)
         if uploaded_content and _is_summary_request(question):
             matches = chunks[:6]
+        if keyword_retrieval_span:
+            keyword_retrieval_span.update(
+                output={
+                    "match_count": len(matches),
+                    "sources": list(dict.fromkeys(source for source, _ in matches)),
+                    "matches": [
+                        {
+                            "source": source,
+                            "text_length": len(chunk),
+                        }
+                        for source, chunk in matches
+                    ],
+                }
+            )
         if not matches:
             return AgentResult(
                 agent="RAG Agent",
