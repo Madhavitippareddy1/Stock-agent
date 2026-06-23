@@ -110,10 +110,14 @@ class SupervisorAgent:
             as_type="agent",
             input=trace_input,
             metadata={
+                "application": "NASDAQ-10 Stock AI Agent",
                 "routes": routes,
                 "tickers": tickers,
                 "has_document": uploaded_content is not None,
+                "uploaded_filename": uploaded_filename or None,
+                "uploaded_bytes": len(uploaded_content) if uploaded_content else 0,
                 "uploaded_content_type": uploaded_content_type if uploaded_content else None,
+                "content_capture_enabled": self.settings.langfuse_capture_content,
             },
         ) as trace:
             sections: list[AgentResult] = []
@@ -122,6 +126,11 @@ class SupervisorAgent:
                     with self.observability.observe(
                         f"{route}-agent",
                         as_type="agent",
+                        input={
+                            "tickers": tickers,
+                            "has_document": uploaded_content is not None,
+                            **self.observability.safe_text(question, label="question"),
+                        },
                         metadata={"route": route, "tickers": tickers},
                     ) as agent_span:
                         if route == "rag":
@@ -136,6 +145,11 @@ class SupervisorAgent:
                                 output={
                                     "agent": result.agent,
                                     "source_count": len(result.sources),
+                                    "sources": result.sources,
+                                    **self.observability.safe_text(
+                                        result.answer,
+                                        label="answer",
+                                    ),
                                 }
                             )
                 except Exception as exc:
@@ -152,9 +166,13 @@ class SupervisorAgent:
                     output={
                         "agents": [item.agent for item in sections],
                         "source_count": len(sources),
+                        "sources": sources,
+                        **self.observability.safe_text(answer, label="answer"),
                     }
                 )
-            return ResearchResult(answer=answer, sections=sections, sources=sources)
+            result = ResearchResult(answer=answer, sections=sections, sources=sources)
+        self.observability.flush()
+        return result
 
 
 def build_supervisor(settings: Settings | None = None) -> SupervisorAgent:

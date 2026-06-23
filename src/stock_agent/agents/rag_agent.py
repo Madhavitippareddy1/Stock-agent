@@ -82,7 +82,11 @@ class RagAgent:
             with self.observability.observe(
                 "retrieve-financial-report-chunks",
                 as_type="retriever",
-                input={"tickers": tickers, "limit": 6},
+                input={
+                    "tickers": tickers,
+                    "limit": 6,
+                    **self.observability.safe_text(question, label="question"),
+                },
             ) as retrieval_span:
                 matches = self.vector_store.search(embedding, tickers)
                 if retrieval_span:
@@ -91,6 +95,17 @@ class RagAgent:
                             "match_count": len(matches),
                             "sources": list(dict.fromkeys(match.source for match in matches)),
                             "scores": [match.score for match in matches],
+                            "matches": [
+                                {
+                                    "ticker": match.ticker,
+                                    "period": match.period,
+                                    "year": match.year,
+                                    "source": match.source,
+                                    "score": match.score,
+                                    "text_length": len(match.text),
+                                }
+                                for match in matches
+                            ],
                         }
                     )
             if not matches:

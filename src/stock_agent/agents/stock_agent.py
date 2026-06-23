@@ -20,6 +20,7 @@ class StockDataAgent:
                     "yahoo-finance-quote",
                     as_type="tool",
                     input={"ticker": ticker},
+                    metadata={"provider": "Yahoo Finance"},
                 ) as tool_span:
                     quote = self.tool.quote(ticker)
                     quotes.append(quote)
@@ -29,6 +30,10 @@ class StockDataAgent:
                                 "ticker": ticker,
                                 "price_available": isinstance(
                                     quote.get("price"), (int, float)
+                                ),
+                                "currency": quote.get("currency"),
+                                "market_cap_available": isinstance(
+                                    quote.get("market_cap"), (int, float)
                                 ),
                             }
                         )

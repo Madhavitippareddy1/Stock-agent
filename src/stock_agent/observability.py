@@ -66,6 +66,11 @@ class Observability:
         if self.client:
             self.client.flush()
 
+    def safe_text(self, value: str, *, label: str = "text") -> dict[str, Any]:
+        if self.settings.langfuse_capture_content:
+            return {label: value, "length": len(value)}
+        return {f"{label}_length": len(value), "content_captured": False}
+
 
 @lru_cache
 def get_observability() -> Observability:

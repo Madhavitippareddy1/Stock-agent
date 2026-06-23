@@ -38,6 +38,13 @@ class BedrockService:
             input=generation_input,
             model=self.settings.bedrock_model_id,
             model_parameters={"maxTokens": 1200, "temperature": 0.1},
+            metadata={
+                "provider": "Amazon Bedrock",
+                "region": self.settings.aws_region,
+                "context_length": len(context),
+                "question_length": len(question),
+                "content_capture_enabled": self.settings.langfuse_capture_content,
+            },
         ) as generation:
             response = self.client.converse(
                 modelId=self.settings.bedrock_model_id,

@@ -14,3 +14,7 @@ def test_content_is_redacted_by_default() -> None:
     observability = Observability(Settings(langfuse_capture_content=False))
 
     assert observability.content("private report", {"length": 14}) == {"length": 14}
+    assert observability.safe_text("private report", label="context") == {
+        "context_length": 14,
+        "content_captured": False,
+    }
