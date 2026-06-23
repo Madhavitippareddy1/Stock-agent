@@ -1,5 +1,7 @@
 import re
+from datetime import datetime
 from difflib import get_close_matches
+from numbers import Real
 from typing import Any
 
 import pandas as pd
@@ -36,7 +38,11 @@ SYMBOL_SEARCH_STOP_WORDS = {
     "latest",
     "live",
     "market",
+    "news",
     "of",
+    "recent",
+    "return",
+    "returns",
     "performance",
     "please",
     "price",
@@ -46,6 +52,9 @@ SYMBOL_SEARCH_STOP_WORDS = {
     "stock",
     "the",
     "trading",
+    "trend",
+    "update",
+    "updates",
     "versus",
     "what",
     "with",
@@ -94,6 +103,18 @@ def first_value(values: dict[str, Any], *keys: str) -> Any:
         if value is not None:
             return value
     return None
+
+
+def percentage_change(current: Any, baseline: Any) -> float | None:
+    if (
+        not isinstance(current, Real)
+        or isinstance(current, bool)
+        or not isinstance(baseline, Real)
+        or isinstance(baseline, bool)
+        or baseline == 0
+    ):
+        return None
+    return (float(current) - float(baseline)) / float(baseline) * 100
 
 
 class YahooStockTool:
@@ -186,13 +207,107 @@ class YahooStockTool:
             if previous_close is None and len(closes) > 1:
                 previous_close = float(closes.iloc[-2])
 
+        change = (
+            float(price) - float(previous_close)
+            if isinstance(price, Real) and isinstance(previous_close, Real)
+            else None
+        )
+        year_change = first_value(fast, "yearChange", "year_change")
+        year_change_percent = (
+            float(year_change) * 100 if isinstance(year_change, Real) else None
+        )
+
         return {
             "ticker": symbol,
             "price": price,
             "previous_close": previous_close,
+            "change": change,
+            "change_percent": percentage_change(price, previous_close),
+            "open": first_value(fast, "open", "regularMarketOpen"),
+            "day_high": first_value(fast, "dayHigh", "day_high"),
+            "day_low": first_value(fast, "dayLow", "day_low"),
+            "year_high": first_value(fast, "yearHigh", "year_high"),
+            "year_low": first_value(fast, "yearLow", "year_low"),
             "market_cap": market_cap,
+            "volume": first_value(fast, "lastVolume", "last_volume"),
+            "average_volume": first_value(
+                fast,
+                "threeMonthAverageVolume",
+                "three_month_average_volume",
+                "tenDayAverageVolume",
+            ),
+            "fifty_day_average": first_value(
+                fast, "fiftyDayAverage", "fifty_day_average"
+            ),
+            "two_hundred_day_average": first_value(
+                fast, "twoHundredDayAverage", "two_hundred_day_average"
+            ),
+            "year_change_percent": year_change_percent,
             "currency": fast.get("currency", "USD"),
         }
+
+    def performance(self, ticker: str) -> dict[str, float | None]:
+        symbol = self.validate_ticker(ticker)
+        history = yf.Ticker(symbol).history(period="1y", auto_adjust=False)
+        closes = history["Close"].dropna() if "Close" in history else pd.Series(dtype=float)
+        if closes.empty:
+            return {
+                "one_month_percent": None,
+                "three_month_percent": None,
+                "six_month_percent": None,
+                "one_year_percent": None,
+            }
+
+        current = float(closes.iloc[-1])
+
+        def return_for_trading_days(days: int) -> float | None:
+            if len(closes) <= days:
+                return None
+            return percentage_change(current, float(closes.iloc[-(days + 1)]))
+
+        return {
+            "one_month_percent": return_for_trading_days(22),
+            "three_month_percent": return_for_trading_days(66),
+            "six_month_percent": return_for_trading_days(126),
+            "one_year_percent": percentage_change(current, float(closes.iloc[0])),
+        }
+
+    def recent_updates(self, ticker: str, limit: int = 3) -> list[dict[str, str]]:
+        symbol = self.validate_ticker(ticker)
+        updates = []
+        for item in yf.Ticker(symbol).news or []:
+            content = item.get("content") or item
+            title = str(content.get("title") or "").strip()
+            if not title:
+                continue
+            provider = content.get("provider") or {}
+            canonical_url = content.get("canonicalUrl") or {}
+            published = content.get("pubDate") or content.get("providerPublishTime")
+            if isinstance(published, Real):
+                published = datetime.fromtimestamp(float(published)).astimezone().isoformat()
+            updates.append(
+                {
+                    "title": title,
+                    "summary": str(content.get("summary") or "").strip(),
+                    "provider": str(
+                        provider.get("displayName")
+                        if isinstance(provider, dict)
+                        else provider
+                        or "Yahoo Finance"
+                    ),
+                    "published_at": str(published or ""),
+                    "url": str(
+                        canonical_url.get("url")
+                        if isinstance(canonical_url, dict)
+                        else canonical_url
+                        or content.get("link")
+                        or ""
+                    ),
+                }
+            )
+            if len(updates) >= limit:
+                break
+        return updates
 
     def history(self, ticker: str, period: str = "6mo") -> pd.DataFrame:
         symbol = self.validate_ticker(ticker)

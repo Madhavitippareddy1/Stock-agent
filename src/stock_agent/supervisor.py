@@ -28,11 +28,30 @@ def _requests_live_stock_data(question: str, has_document: bool) -> bool:
                 "current market",
                 "current stock",
                 "performance",
+                "recent",
+                "update",
+                "news",
+                "trend",
+                "return",
+                "details",
                 "trading",
             )
         )
     return any(
-        word in lowered for word in ("price", "stock", "market", "quote", "performance")
+        word in lowered
+        for word in (
+            "price",
+            "stock",
+            "market",
+            "quote",
+            "performance",
+            "recent",
+            "update",
+            "news",
+            "trend",
+            "return",
+            "details",
+        )
     )
 
 

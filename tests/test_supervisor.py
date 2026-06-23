@@ -29,6 +29,15 @@ def test_supervisor_routes_price_request_to_stock_agent() -> None:
     assert [section.agent for section in result.sections] == ["Stock"]
 
 
+def test_supervisor_routes_recent_company_updates_to_stock_agent() -> None:
+    supervisor = SupervisorAgent(
+        rag_agent=FakeAgent("RAG"),
+        stock_agent=FakeAgent("Stock"),
+    )
+    result = supervisor.run("Recent updates and performance for AAPL")
+    assert [section.agent for section in result.sections] == ["Stock"]
+
+
 def test_uploaded_report_analysis_does_not_start_stock_data_agent() -> None:
     supervisor = SupervisorAgent(
         rag_agent=FakeAgent("RAG"),
