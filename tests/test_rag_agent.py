@@ -1,4 +1,34 @@
+from contextlib import contextmanager
+
 from stock_agent.agents.rag_agent import RagAgent, _retrieve
+from stock_agent.config import Settings
+from stock_agent.services.s3_reports import ReportObject
+
+
+class FakeObservation:
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.updates = []
+
+    def update(self, **kwargs) -> None:
+        self.updates.append(kwargs)
+
+
+class FakeObservability:
+    def __init__(self) -> None:
+        self.observations = []
+
+    def content(self, value, fallback):
+        return fallback
+
+    def safe_text(self, value: str, *, label: str = "text"):
+        return {f"{label}_length": len(value), "content_captured": False}
+
+    @contextmanager
+    def observe(self, name: str, **kwargs):
+        observation = FakeObservation(name)
+        self.observations.append({"name": name, "kwargs": kwargs, "observation": observation})
+        yield observation
 
 
 def test_retrieve_ranks_relevant_chunk_first() -> None:
@@ -20,9 +50,44 @@ def test_rag_agent_uses_uploaded_text_without_aws() -> None:
     assert "Uploaded document" in result.answer
 
 
+def test_uploaded_rag_records_extraction_chunking_and_retrieval_spans() -> None:
+    observability = FakeObservability()
+    result = RagAgent(observability=observability).run(
+        "Please summarize this",
+        ("AAPL",),
+        b"Company AAPL generated strong operating cash flow.",
+        "text/plain",
+    )
+
+    observation_names = [item["name"] for item in observability.observations]
+    assert result.sources == ["Uploaded document"]
+    assert "extract-uploaded-financial-report" in observation_names
+    assert "chunk-financial-report-documents" in observation_names
+    assert "keyword-retrieve-financial-report-chunks" in observation_names
+
+
 class FakeReports:
     def list_reports(self, tickers):
         raise AssertionError("S3 must not be searched when a document is uploaded")
+
+
+class FakeS3Reports:
+    settings = Settings(reports_bucket="reports-bucket", reports_prefix="financial-reports")
+
+    def list_reports(self, tickers):
+        assert tickers == ("AAPL",)
+        return [
+            ReportObject(
+                key="financial-reports/AAPL/annual/2026/AAPL-annual.txt",
+                ticker="AAPL",
+                period="annual",
+                year="2026",
+            )
+        ]
+
+    def download(self, key):
+        assert key == "financial-reports/AAPL/annual/2026/AAPL-annual.txt"
+        return b"AAPL annual report revenue increased and margin improved.", "text/plain"
 
 
 class FakeBedrock:
@@ -69,6 +134,23 @@ def test_generic_summary_request_uses_uploaded_chunks_without_keyword_overlap() 
         "text/plain",
     )
     assert "Uploaded document" in result.answer
+
+
+def test_s3_rag_records_financial_report_tool_spans() -> None:
+    observability = FakeObservability()
+    result = RagAgent(
+        reports=FakeS3Reports(),
+        observability=observability,
+    ).run("What happened to revenue and margin?", ("AAPL",))
+
+    observation_names = [item["name"] for item in observability.observations]
+    assert result.sources == [
+        "s3://reports-bucket/financial-reports/AAPL/annual/2026/AAPL-annual.txt"
+    ]
+    assert "s3-list-financial-reports" in observation_names
+    assert "s3-download-financial-report" in observation_names
+    assert "chunk-financial-report-documents" in observation_names
+    assert "keyword-retrieve-financial-report-chunks" in observation_names
 
 
 def test_rag_agent_uses_ticker_filtered_vector_search() -> None:

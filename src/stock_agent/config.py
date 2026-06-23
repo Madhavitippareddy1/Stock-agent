@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     bedrock_model_id: str = "amazon.nova-lite-v1:0"
     bedrock_embedding_model_id: str = "amazon.titan-embed-text-v2:0"
     embedding_dimension: int = 1024
+    bedrock_input_cost_per_1m_tokens: float = 0.06
+    bedrock_output_cost_per_1m_tokens: float = 0.24
+    bedrock_embedding_cost_per_1m_tokens: float = 0.02
     opensearch_endpoint: str = ""
     opensearch_index: str = "financial-report-chunks"
     reports_bucket: str = ""

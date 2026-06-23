@@ -15,56 +15,74 @@ class StockDataAgent:
         self.observability = observability or get_observability()
 
     def run(self, tickers: tuple[str, ...]) -> AgentResult:
-        if not tickers:
-            return AgentResult(
+        with self.observability.observe(
+            "stock-data-agent-run",
+            as_type="agent",
+            input={"tickers": tickers},
+            metadata={"agent": "Stock Data Agent", "provider": "Yahoo Finance"},
+        ) as agent_span:
+            if not tickers:
+                result = AgentResult(
+                    agent="Stock Data Agent",
+                    answer=(
+                        "I could not identify the requested company or ticker. "
+                        "Please enter a company name such as PepsiCo or a symbol such as PEP."
+                    ),
+                    sources=["Yahoo Finance"],
+                    data={"quotes": []},
+                )
+                if agent_span:
+                    agent_span.update(output={"quote_count": 0, "tickers": []})
+                return result
+            quotes = []
+            for ticker in tickers:
+                try:
+                    with self.observability.observe(
+                        "yahoo-finance-quote",
+                        as_type="tool",
+                        input={"ticker": ticker},
+                        metadata={"provider": "Yahoo Finance"},
+                    ) as tool_span:
+                        quote = self.tool.quote(ticker)
+                        quote["performance"] = self._load_performance(ticker)
+                        quote["recent_updates"] = self._load_recent_updates(ticker)
+                        quotes.append(quote)
+                        if tool_span:
+                            tool_span.update(
+                                output={
+                                    "ticker": ticker,
+                                    "price_available": isinstance(
+                                        quote.get("price"), (int, float)
+                                    ),
+                                    "currency": quote.get("currency"),
+                                    "market_cap_available": isinstance(
+                                        quote.get("market_cap"), (int, float)
+                                    ),
+                                }
+                            )
+                except Exception as exc:
+                    quotes.append({"ticker": ticker, "error": str(exc)})
+            rows = []
+            for quote in quotes:
+                if quote.get("error"):
+                    rows.append(f"- **{quote['ticker']}**: unavailable")
+                else:
+                    rows.append(self._format_stock_details(quote))
+            result = AgentResult(
                 agent="Stock Data Agent",
-                answer=(
-                    "I could not identify the requested company or ticker. "
-                    "Please enter a company name such as PepsiCo or a symbol such as PEP."
-                ),
+                answer="\n".join(rows),
                 sources=["Yahoo Finance"],
-                data={"quotes": []},
+                data={"quotes": quotes},
             )
-        quotes = []
-        for ticker in tickers:
-            try:
-                with self.observability.observe(
-                    "yahoo-finance-quote",
-                    as_type="tool",
-                    input={"ticker": ticker},
-                    metadata={"provider": "Yahoo Finance"},
-                ) as tool_span:
-                    quote = self.tool.quote(ticker)
-                    quote["performance"] = self._load_performance(ticker)
-                    quote["recent_updates"] = self._load_recent_updates(ticker)
-                    quotes.append(quote)
-                    if tool_span:
-                        tool_span.update(
-                            output={
-                                "ticker": ticker,
-                                "price_available": isinstance(
-                                    quote.get("price"), (int, float)
-                                ),
-                                "currency": quote.get("currency"),
-                                "market_cap_available": isinstance(
-                                    quote.get("market_cap"), (int, float)
-                                ),
-                            }
-                        )
-            except Exception as exc:
-                quotes.append({"ticker": ticker, "error": str(exc)})
-        rows = []
-        for quote in quotes:
-            if quote.get("error"):
-                rows.append(f"- **{quote['ticker']}**: unavailable")
-            else:
-                rows.append(self._format_stock_details(quote))
-        return AgentResult(
-            agent="Stock Data Agent",
-            answer="\n".join(rows),
-            sources=["Yahoo Finance"],
-            data={"quotes": quotes},
-        )
+            if agent_span:
+                agent_span.update(
+                    output={
+                        "quote_count": len(quotes),
+                        "tickers": [quote.get("ticker") for quote in quotes],
+                        "error_count": sum(1 for quote in quotes if quote.get("error")),
+                    }
+                )
+            return result
 
     def _load_performance(self, ticker: str) -> dict:
         performance_tool = getattr(self.tool, "performance", None)

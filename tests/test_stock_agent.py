@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 import pandas as pd
 
 from stock_agent.agents.stock_agent import StockDataAgent
@@ -56,6 +58,26 @@ class DetailedFakeStockTool:
         ][:limit]
 
 
+class FakeObservation:
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.updates = []
+
+    def update(self, **kwargs) -> None:
+        self.updates.append(kwargs)
+
+
+class FakeObservability:
+    def __init__(self) -> None:
+        self.observations = []
+
+    @contextmanager
+    def observe(self, name: str, **kwargs):
+        observation = FakeObservation(name)
+        self.observations.append({"name": name, "kwargs": kwargs, "observation": observation})
+        yield observation
+
+
 class FakeSearch:
     quotes = []
 
@@ -89,6 +111,21 @@ def test_stock_agent_adds_performance_trends_and_recent_updates() -> None:
     assert "1 month: +2.50%" in result.answer
     assert "above 50-day average" in result.answer
     assert "CSX posts an operating update" in result.answer
+
+
+def test_stock_agent_records_agent_and_yahoo_tool_spans() -> None:
+    observability = FakeObservability()
+    result = StockDataAgent(
+        DetailedFakeStockTool(),
+        observability=observability,
+    ).run(("CSX",))
+
+    observation_names = [item["name"] for item in observability.observations]
+    assert result.agent == "Stock Data Agent"
+    assert "stock-data-agent-run" in observation_names
+    assert "yahoo-finance-quote" in observation_names
+    assert "yahoo-finance-performance" in observation_names
+    assert "yahoo-finance-recent-updates" in observation_names
 
 
 def test_stock_agent_formats_two_requested_stocks_only() -> None:
