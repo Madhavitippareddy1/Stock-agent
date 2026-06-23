@@ -6,6 +6,7 @@ from stock_agent.tools.stock_data import (
     YahooStockTool,
     first_value,
     normalize_snapshot_frame,
+    resolve_alias_symbols,
 )
 
 
@@ -42,6 +43,10 @@ def test_company_alias_resolves_cisco_without_vendor_search(monkeypatch) -> None
     assert YahooStockTool().search_symbols("Cisco Systems share price", limit=1) == (
         "CSCO",
     )
+
+
+def test_multiple_misspelled_company_names_resolve_in_question_order() -> None:
+    assert resolve_alias_symbols("compare nvdia with amzon") == ("NVDA", "AMZN")
 
 
 def test_snapshot_normalization_handles_error_and_missing_rows() -> None:

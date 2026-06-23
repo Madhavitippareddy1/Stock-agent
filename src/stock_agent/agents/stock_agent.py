@@ -55,4 +55,4 @@ class StockDataAgent:
         )
 
     def resolve_tickers(self, question: str) -> tuple[str, ...]:
-        return self.tool.search_symbols(question, limit=1)
+        return self.tool.search_symbols(question, limit=5)

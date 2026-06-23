@@ -1,4 +1,5 @@
 import re
+from difflib import get_close_matches
 from typing import Any
 
 import pandas as pd
@@ -8,9 +9,72 @@ from stock_agent.config import Settings, get_settings
 
 
 COMPANY_SYMBOL_ALIASES = {
+    "nvidia": "NVDA",
+    "amazon": "AMZN",
+    "apple": "AAPL",
+    "microsoft": "MSFT",
+    "google": "GOOGL",
+    "alphabet": "GOOGL",
+    "meta": "META",
+    "facebook": "META",
+    "broadcom": "AVGO",
+    "tesla": "TSLA",
+    "costco": "COST",
+    "netflix": "NFLX",
     "cisco": "CSCO",
     "cisco systems": "CSCO",
 }
+
+SYMBOL_SEARCH_STOP_WORDS = {
+    "and",
+    "compare",
+    "comparison",
+    "current",
+    "for",
+    "give",
+    "is",
+    "latest",
+    "live",
+    "market",
+    "of",
+    "performance",
+    "please",
+    "price",
+    "quote",
+    "share",
+    "show",
+    "stock",
+    "the",
+    "trading",
+    "versus",
+    "what",
+    "with",
+}
+
+
+def resolve_alias_symbols(query: str, limit: int = 5) -> tuple[str, ...]:
+    """Resolve multiple company names, including close single-word misspellings."""
+    normalized = query.lower()
+    matches: list[tuple[int, str]] = []
+
+    for company_name, symbol in COMPANY_SYMBOL_ALIASES.items():
+        phrase_match = re.search(rf"\b{re.escape(company_name)}\b", normalized)
+        if phrase_match:
+            matches.append((phrase_match.start(), symbol))
+
+    single_word_aliases = {
+        name: symbol for name, symbol in COMPANY_SYMBOL_ALIASES.items() if " " not in name
+    }
+    for token_match in re.finditer(r"\b[a-z]{4,}\b", normalized):
+        token = token_match.group()
+        if token in SYMBOL_SEARCH_STOP_WORDS or token in single_word_aliases:
+            continue
+        close = get_close_matches(token, single_word_aliases, n=1, cutoff=0.78)
+        if close:
+            matches.append((token_match.start(), single_word_aliases[close[0]]))
+
+    ordered = [symbol for _, symbol in sorted(matches)]
+    return tuple(dict.fromkeys(ordered))[:limit]
 
 
 def normalize_snapshot_frame(frame: pd.DataFrame) -> pd.DataFrame:
@@ -41,10 +105,9 @@ class YahooStockTool:
         return normalized
 
     def search_symbols(self, query: str, limit: int = 3) -> tuple[str, ...]:
-        normalized_query = query.lower()
-        for company_name, symbol in COMPANY_SYMBOL_ALIASES.items():
-            if re.search(rf"\b{re.escape(company_name)}\b", normalized_query):
-                return (symbol,)
+        alias_symbols = resolve_alias_symbols(query, limit=limit)
+        if alias_symbols:
+            return alias_symbols
 
         search_query = re.sub(
             r"\b(current|latest|live|stock|share|price|quote|market|performance|trading|please|show|give|what|is|the|for|of)\b",

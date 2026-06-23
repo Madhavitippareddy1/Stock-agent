@@ -55,7 +55,18 @@ class TickerCaptureAgent:
     def resolve_tickers(self, question: str) -> tuple[str, ...]:
         if "Cisco Systems" in question:
             return ("CSCO",)
+        if "nvdia" in question and "amzon" in question:
+            return ("NVDA", "AMZN")
         return ()
+
+
+class RagTickerCaptureAgent:
+    def __init__(self) -> None:
+        self.tickers = ()
+
+    def run(self, question, tickers, uploaded_content=None, uploaded_content_type=None):
+        self.tickers = tickers
+        return AgentResult(agent="RAG", answer="RAG result")
 
 
 def test_uploaded_filename_scopes_explicit_price_request() -> None:
@@ -103,3 +114,21 @@ def test_company_name_outside_top_ten_resolves_to_single_symbol() -> None:
     )
     assert [section.agent for section in result.sections] == ["Stock"]
     assert stock_agent.tickers == ("CSCO",)
+
+
+def test_misspelled_comparison_scopes_both_agents_to_two_stocks() -> None:
+    stock_agent = TickerCaptureAgent()
+    rag_agent = RagTickerCaptureAgent()
+    supervisor = SupervisorAgent(
+        rag_agent=rag_agent,
+        stock_agent=stock_agent,
+    )
+
+    result = supervisor.run(
+        "compare nvdia with amzon",
+        selected_tickers=("NVDA", "GOOGL", "AAPL", "MSFT", "AMZN"),
+    )
+
+    assert [section.agent for section in result.sections] == ["RAG", "Stock"]
+    assert rag_agent.tickers == ("NVDA", "AMZN")
+    assert stock_agent.tickers == ("NVDA", "AMZN")
