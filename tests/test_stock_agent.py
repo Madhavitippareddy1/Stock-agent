@@ -18,6 +18,23 @@ class FakeStockTool:
 class FakeSearch:
     quotes = []
 
+class InvalidThenCsxSearch:
+    def __init__(self, *args, **kwargs) -> None:
+        self.quotes = [
+            {
+                "symbol": "0HRJ.L",
+                "quoteType": "EQUITY",
+                "exchange": "LSE",
+                "score": 30000,
+            },
+            {
+                "symbol": "CSX",
+                "quoteType": "EQUITY",
+                "exchange": "NMS",
+                "score": 20000,
+            },
+        ]
+
 
 def test_stock_agent_formats_price() -> None:
     result = StockDataAgent(FakeStockTool()).run(("AAPL",))
@@ -47,6 +64,17 @@ def test_company_alias_resolves_cisco_without_vendor_search(monkeypatch) -> None
 
 def test_multiple_misspelled_company_names_resolve_in_question_order() -> None:
     assert resolve_alias_symbols("compare nvdia with amzon") == ("NVDA", "AMZN")
+
+
+def test_full_company_name_returns_one_primary_us_symbol(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "stock_agent.tools.stock_data.yf.Search",
+        InvalidThenCsxSearch,
+    )
+
+    assert YahooStockTool().search_symbols("CSX Corporation stock price", limit=5) == (
+        "CSX",
+    )
 
 
 def test_snapshot_normalization_handles_error_and_missing_rows() -> None:

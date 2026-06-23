@@ -55,6 +55,8 @@ class TickerCaptureAgent:
     def resolve_tickers(self, question: str) -> tuple[str, ...]:
         if "Cisco Systems" in question:
             return ("CSCO",)
+        if "CSX Corporation" in question:
+            return ("CSX",)
         if "nvdia" in question and "amzon" in question:
             return ("NVDA", "AMZN")
         return ()
@@ -132,3 +134,19 @@ def test_misspelled_comparison_scopes_both_agents_to_two_stocks() -> None:
     assert [section.agent for section in result.sections] == ["RAG", "Stock"]
     assert rag_agent.tickers == ("NVDA", "AMZN")
     assert stock_agent.tickers == ("NVDA", "AMZN")
+
+
+def test_full_company_name_price_request_uses_one_resolved_symbol() -> None:
+    stock_agent = TickerCaptureAgent()
+    supervisor = SupervisorAgent(
+        rag_agent=FakeAgent("RAG"),
+        stock_agent=stock_agent,
+    )
+
+    result = supervisor.run(
+        "CSX Corporation stock price",
+        selected_tickers=("NVDA", "GOOGL", "AAPL"),
+    )
+
+    assert [section.agent for section in result.sections] == ["Stock"]
+    assert stock_agent.tickers == ("CSX",)

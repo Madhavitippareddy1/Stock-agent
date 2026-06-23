@@ -51,6 +51,8 @@ SYMBOL_SEARCH_STOP_WORDS = {
     "with",
 }
 
+PRIMARY_US_EXCHANGES = {"NMS", "NYQ", "NGM", "NCM", "ASE", "PCX", "BTS"}
+
 
 def resolve_alias_symbols(query: str, limit: int = 5) -> tuple[str, ...]:
     """Resolve multiple company names, including close single-word misspellings."""
@@ -109,6 +111,31 @@ class YahooStockTool:
         if alias_symbols:
             return alias_symbols
 
+        comparison_parts = self._comparison_parts(query)
+        if len(comparison_parts) > 1:
+            symbols = [
+                symbol
+                for part in comparison_parts
+                if (symbol := self._search_best_symbol(part)) is not None
+            ]
+            return tuple(dict.fromkeys(symbols))[:limit]
+
+        symbol = self._search_best_symbol(query)
+        return (symbol,) if symbol else ()
+
+    def _comparison_parts(self, query: str) -> tuple[str, ...]:
+        if not re.search(r"\b(compare|comparison|versus|vs)\b", query, re.IGNORECASE):
+            return ()
+        cleaned = re.sub(
+            r"\b(compare|comparison|between)\b",
+            " ",
+            query,
+            flags=re.IGNORECASE,
+        )
+        parts = re.split(r"\b(?:with|versus|vs|and)\b", cleaned, flags=re.IGNORECASE)
+        return tuple(part.strip(" ,") for part in parts if part.strip(" ,"))
+
+    def _search_best_symbol(self, query: str) -> str | None:
         search_query = re.sub(
             r"\b(current|latest|live|stock|share|price|quote|market|performance|trading|please|show|give|what|is|the|for|of)\b",
             " ",
@@ -116,16 +143,27 @@ class YahooStockTool:
             flags=re.IGNORECASE,
         )
         search_query = " ".join(search_query.split()) or query
-        search = yf.Search(search_query, max_results=max(limit, 5), news_count=0)
-        symbols = []
-        for quote in search.quotes:
+        search = yf.Search(search_query, max_results=10, news_count=0)
+        equity_quotes = [
+            quote
+            for quote in search.quotes
+            if str(quote.get("quoteType", "")).upper() in {"EQUITY", "ETF"}
+        ]
+        equity_quotes.sort(
+            key=lambda quote: (
+                str(quote.get("exchange", "")).upper() not in PRIMARY_US_EXCHANGES,
+                -float(quote.get("score") or 0),
+            )
+        )
+        for quote in equity_quotes:
             symbol = quote.get("symbol")
-            quote_type = str(quote.get("quoteType", "")).upper()
-            if symbol and quote_type in {"EQUITY", "ETF"}:
-                symbols.append(self.validate_ticker(symbol))
-            if len(symbols) == limit:
-                break
-        return tuple(dict.fromkeys(symbols))
+            if not symbol:
+                continue
+            try:
+                return self.validate_ticker(symbol)
+            except ValueError:
+                continue
+        return None
 
     def quote(self, ticker: str) -> dict[str, Any]:
         symbol = self.validate_ticker(ticker)
