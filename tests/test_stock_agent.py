@@ -126,6 +126,28 @@ def test_stock_agent_records_agent_and_yahoo_tool_spans() -> None:
     assert "yahoo-finance-quote" in observation_names
     assert "yahoo-finance-performance" in observation_names
     assert "yahoo-finance-recent-updates" in observation_names
+    assert "stock-price-summary" in observation_names
+
+
+def test_stock_agent_records_average_price_summary() -> None:
+    observability = FakeObservability()
+    StockDataAgent(
+        DetailedFakeStockTool(),
+        observability=observability,
+    ).run(("AAPL", "MSFT"))
+
+    price_span = next(
+        item
+        for item in observability.observations
+        if item["name"] == "stock-price-summary"
+    )["observation"]
+    price_update = price_span.updates[0]
+
+    assert price_update["output"]["available_price_count"] == 2
+    assert price_update["output"]["average_price"] == 101.0
+    assert price_update["output"]["min_price"] == 101.0
+    assert price_update["output"]["max_price"] == 101.0
+    assert price_update["output"]["currency"] == "USD"
 
 
 def test_stock_agent_formats_two_requested_stocks_only() -> None:
