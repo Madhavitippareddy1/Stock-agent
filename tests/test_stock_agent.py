@@ -171,6 +171,16 @@ def test_investment_style_pepsico_question_resolves_one_symbol(monkeypatch) -> N
     ) == ("PEP",)
 
 
+def test_investment_style_target_question_resolves_target_corporation(monkeypatch) -> None:
+    monkeypatch.setattr("stock_agent.tools.stock_data.yf.Search", FakeSearch)
+    assert YahooStockTool().search_symbols("can i buy target", limit=5) == ("TGT",)
+
+
+def test_target_price_question_does_not_resolve_to_target_corporation(monkeypatch) -> None:
+    monkeypatch.setattr("stock_agent.tools.stock_data.yf.Search", FakeSearch)
+    assert YahooStockTool().search_symbols("target price for apple", limit=5) == ("AAPL",)
+
+
 def test_empty_stock_scope_does_not_render_default_stocks() -> None:
     result = StockDataAgent(FakeStockTool()).run(())
     assert "could not identify" in result.answer

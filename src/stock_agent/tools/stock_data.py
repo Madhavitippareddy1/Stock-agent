@@ -28,6 +28,8 @@ COMPANY_SYMBOL_ALIASES = {
     "pepsi": "PEP",
     "pepsico": "PEP",
     "pepsico inc": "PEP",
+    "target": "TGT",
+    "target corporation": "TGT",
 }
 
 SYMBOL_SEARCH_STOP_WORDS = {
@@ -77,6 +79,8 @@ def resolve_alias_symbols(query: str, limit: int = 5) -> tuple[str, ...]:
     matches: list[tuple[int, str]] = []
 
     for company_name, symbol in COMPANY_SYMBOL_ALIASES.items():
+        if company_name == "target" and re.search(r"\btarget\s+price\b", normalized):
+            continue
         phrase_match = re.search(rf"\b{re.escape(company_name)}\b", normalized)
         if phrase_match:
             matches.append((phrase_match.start(), symbol))

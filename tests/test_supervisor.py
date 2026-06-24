@@ -68,6 +68,8 @@ class TickerCaptureAgent:
             return ("CSX",)
         if "PepsiCo" in question:
             return ("PEP",)
+        if "target" in question.lower():
+            return ("TGT",)
         if "apple" in question.lower() and "meta" in question.lower():
             return ("AAPL", "META")
         if "nvdia" in question and "amzon" in question:
@@ -179,6 +181,22 @@ def test_pepsico_buying_question_uses_only_pep() -> None:
 
     assert [section.agent for section in result.sections] == ["Stock"]
     assert stock_agent.tickers == ("PEP",)
+
+
+def test_target_buying_question_uses_tgt() -> None:
+    stock_agent = TickerCaptureAgent()
+    supervisor = SupervisorAgent(
+        rag_agent=FakeAgent("RAG"),
+        stock_agent=stock_agent,
+    )
+
+    result = supervisor.run(
+        "can i buy target",
+        selected_tickers=("NVDA", "GOOGL", "AAPL"),
+    )
+
+    assert [section.agent for section in result.sections] == ["Stock"]
+    assert stock_agent.tickers == ("TGT",)
 
 
 def test_company_name_and_ticker_like_name_are_merged_for_comparison() -> None:
