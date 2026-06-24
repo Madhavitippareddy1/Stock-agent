@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 from stock_agent.models import AgentResult
 from stock_agent.supervisor import SupervisorAgent, extract_tickers
 
@@ -11,6 +13,39 @@ class FakeAgent:
 
     def resolve_tickers(self, question: str) -> tuple[str, ...]:
         return ()
+
+
+class FakeObservation:
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.updates = []
+
+    def update(self, **kwargs) -> None:
+        self.updates.append(kwargs)
+
+
+class FakeObservability:
+    def __init__(self, *, capture_content: bool = False) -> None:
+        self.observations = []
+        self.capture_content = capture_content
+        self.flushed = False
+
+    def content(self, value, fallback):
+        return value if self.capture_content else fallback
+
+    def safe_text(self, value: str, *, label: str = "text"):
+        if self.capture_content:
+            return {label: value, "length": len(value)}
+        return {f"{label}_length": len(value), "content_captured": False}
+
+    @contextmanager
+    def observe(self, name: str, **kwargs):
+        observation = FakeObservation(name)
+        self.observations.append({"name": name, "kwargs": kwargs, "observation": observation})
+        yield observation
+
+    def flush(self):
+        self.flushed = True
 
 
 def test_extract_tickers_returns_selected_symbols() -> None:
@@ -68,6 +103,10 @@ class TickerCaptureAgent:
             return ("CSX",)
         if "PepsiCo" in question:
             return ("PEP",)
+        if "target" in question.lower():
+            return ("TGT",)
+        if "apple" in question.lower() and "meta" in question.lower():
+            return ("AAPL", "META")
         if "nvdia" in question and "amzon" in question:
             return ("NVDA", "AMZN")
         return ()
@@ -179,6 +218,39 @@ def test_pepsico_buying_question_uses_only_pep() -> None:
     assert stock_agent.tickers == ("PEP",)
 
 
+def test_target_buying_question_uses_tgt() -> None:
+    stock_agent = TickerCaptureAgent()
+    supervisor = SupervisorAgent(
+        rag_agent=FakeAgent("RAG"),
+        stock_agent=stock_agent,
+    )
+
+    result = supervisor.run(
+        "can i buy target",
+        selected_tickers=("NVDA", "GOOGL", "AAPL"),
+    )
+
+    assert [section.agent for section in result.sections] == ["Stock"]
+    assert stock_agent.tickers == ("TGT",)
+
+
+def test_company_name_and_ticker_like_name_are_merged_for_comparison() -> None:
+    stock_agent = TickerCaptureAgent()
+    rag_agent = RagTickerCaptureAgent()
+    supervisor = SupervisorAgent(
+        rag_agent=rag_agent,
+        stock_agent=stock_agent,
+    )
+
+    result = supervisor.run(
+        "compare apple and meta stocks",
+        selected_tickers=("NVDA", "GOOGL", "AAPL", "META"),
+    )
+
+    assert [section.agent for section in result.sections] == ["Stock"]
+    assert stock_agent.tickers == ("AAPL", "META")
+
+
 def test_unresolved_stock_question_does_not_fall_back_to_top_ten() -> None:
     stock_agent = TickerCaptureAgent()
     supervisor = SupervisorAgent(
@@ -192,3 +264,30 @@ def test_unresolved_stock_question_does_not_fall_back_to_top_ten() -> None:
     )
 
     assert stock_agent.tickers == ()
+
+
+def test_supervisor_records_query_details_in_langfuse_trace() -> None:
+    observability = FakeObservability()
+    stock_agent = TickerCaptureAgent()
+    supervisor = SupervisorAgent(
+        rag_agent=FakeAgent("RAG"),
+        stock_agent=stock_agent,
+        observability=observability,
+    )
+
+    supervisor.run(
+        "compare apple and meta stocks",
+        selected_tickers=("NVDA", "GOOGL", "AAPL", "META"),
+    )
+
+    trace = next(
+        item for item in observability.observations if item["name"] == "stock-agent-research"
+    )
+    query_details = trace["kwargs"]["metadata"]["query_details"]
+
+    assert query_details["requested_tickers"] == ("AAPL", "META")
+    assert query_details["requested_ticker_count"] == 2
+    assert "comparison" in query_details["detected_intents"]
+    assert query_details["content_capture_enabled"] is False
+    assert "query" not in query_details
+    assert observability.flushed is True

@@ -16,6 +16,16 @@ def extract_tickers(question: str, allowed: tuple[str, ...]) -> tuple[str, ...]:
     return find_tickers(question, allowed) or allowed
 
 
+def merge_tickers(*ticker_groups: tuple[str, ...]) -> tuple[str, ...]:
+    merged = []
+    for group in ticker_groups:
+        for ticker in group:
+            normalized = ticker.upper()
+            if normalized not in merged:
+                merged.append(normalized)
+    return tuple(merged)
+
+
 def _requests_live_stock_data(question: str, has_document: bool) -> bool:
     lowered = question.lower()
     if has_document:
@@ -82,6 +92,46 @@ def _references_uploaded_document(question: str) -> bool:
     )
 
 
+def _query_details(
+    question: str,
+    *,
+    routes: tuple[str, ...],
+    tickers: tuple[str, ...],
+    has_document: bool,
+    uploaded_filename: str,
+    capture_content: bool,
+) -> dict:
+    lowered = question.lower()
+    intent_keywords = {
+        "price": ("price", "quote", "share", "shares", "market"),
+        "comparison": ("compare", "versus", " vs ", "with"),
+        "buying_decision": ("buy", "buying", "right time", "invest"),
+        "report_analysis": ("report", "revenue", "filing", "10-k", "10-q", "analyze", "analyse"),
+        "performance": ("performance", "trend", "return", "recent", "update"),
+    }
+    intents = [
+        intent
+        for intent, keywords in intent_keywords.items()
+        if any(keyword in lowered for keyword in keywords)
+    ]
+    words = re.findall(r"\b[\w'-]+\b", question)
+    details = {
+        "query_length": len(question),
+        "query_word_count": len(words),
+        "query_contains_question_mark": "?" in question,
+        "detected_intents": intents or ["general_research"],
+        "routes": routes,
+        "requested_tickers": tickers,
+        "requested_ticker_count": len(tickers),
+        "has_uploaded_document": has_document,
+        "uploaded_filename": uploaded_filename or None,
+        "content_capture_enabled": capture_content,
+    }
+    if capture_content:
+        details["query"] = question
+    return details
+
+
 class SupervisorAgent:
     def __init__(
         self,
@@ -116,21 +166,30 @@ class SupervisorAgent:
     ) -> ResearchResult:
         routes = self.route(question, uploaded_content is not None)
         question_tickers = find_tickers(question, self.settings.tickers)
-        tickers = question_tickers
-        if "stock" in routes and not question_tickers:
+        resolved_tickers = ()
+        if "stock" in routes:
             try:
-                tickers = self.stock_agent.resolve_tickers(question)
+                resolved_tickers = self.stock_agent.resolve_tickers(question)
             except (AttributeError, ValueError):
-                tickers = ()
+                resolved_tickers = ()
+        tickers = merge_tickers(resolved_tickers, question_tickers)
         document_tickers = find_tickers(uploaded_filename, self.settings.tickers)
         if not tickers:
             if uploaded_content is not None:
                 tickers = document_tickers or selected_tickers or ()
             elif "stock" not in routes:
                 tickers = selected_tickers or self.settings.tickers
+        query_details = _query_details(
+            question,
+            routes=routes,
+            tickers=tickers,
+            has_document=uploaded_content is not None,
+            uploaded_filename=uploaded_filename,
+            capture_content=self.settings.langfuse_capture_content,
+        )
         trace_input = self.observability.content(
-            {"question": question},
-            {"question_length": len(question)},
+            {"question": question, "query_details": query_details},
+            query_details,
         )
         with self.observability.observe(
             "stock-agent-research",
@@ -140,6 +199,7 @@ class SupervisorAgent:
                 "application": "NASDAQ-10 Stock AI Agent",
                 "routes": routes,
                 "tickers": tickers,
+                "query_details": query_details,
                 "has_document": uploaded_content is not None,
                 "uploaded_filename": uploaded_filename or None,
                 "uploaded_bytes": len(uploaded_content) if uploaded_content else 0,
@@ -194,6 +254,7 @@ class SupervisorAgent:
                         "agents": [item.agent for item in sections],
                         "source_count": len(sources),
                         "sources": sources,
+                        "query_details": query_details,
                         **self.observability.safe_text(answer, label="answer"),
                     }
                 )

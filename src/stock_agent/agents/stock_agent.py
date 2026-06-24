@@ -74,15 +74,69 @@ class StockDataAgent:
                 sources=["Yahoo Finance"],
                 data={"quotes": quotes},
             )
+            price_summary = self._price_summary(quotes)
+            with self.observability.observe(
+                "stock-price-summary",
+                as_type="span",
+                input={
+                    "tickers": [quote.get("ticker") for quote in quotes],
+                    "quote_count": len(quotes),
+                },
+                metadata={
+                    "metric": "average_current_price",
+                    "provider": "Yahoo Finance",
+                    "currency": price_summary.get("currency"),
+                },
+            ) as price_span:
+                if price_span:
+                    price_span.update(output=price_summary)
             if agent_span:
                 agent_span.update(
                     output={
                         "quote_count": len(quotes),
                         "tickers": [quote.get("ticker") for quote in quotes],
                         "error_count": sum(1 for quote in quotes if quote.get("error")),
+                        "price_summary": price_summary,
                     }
                 )
             return result
+
+    def _price_summary(self, quotes: list[dict]) -> dict:
+        valid_quotes = [
+            quote
+            for quote in quotes
+            if self._is_number(quote.get("price")) and not quote.get("error")
+        ]
+        prices = [float(quote["price"]) for quote in valid_quotes]
+        currencies = sorted(
+            {
+                str(quote.get("currency") or "USD")
+                for quote in valid_quotes
+                if quote.get("currency") or quote.get("price") is not None
+            }
+        )
+        if not prices:
+            return {
+                "available_price_count": 0,
+                "missing_price_count": len(quotes),
+                "average_price": None,
+                "min_price": None,
+                "max_price": None,
+                "currency": currencies[0] if len(currencies) == 1 else None,
+                "mixed_currencies": len(currencies) > 1,
+                "tickers": [quote.get("ticker") for quote in quotes],
+            }
+        average_price = sum(prices) / len(prices)
+        return {
+            "available_price_count": len(prices),
+            "missing_price_count": len(quotes) - len(prices),
+            "average_price": round(average_price, 4),
+            "min_price": round(min(prices), 4),
+            "max_price": round(max(prices), 4),
+            "currency": currencies[0] if len(currencies) == 1 else None,
+            "mixed_currencies": len(currencies) > 1,
+            "tickers": [quote.get("ticker") for quote in valid_quotes],
+        }
 
     def _load_performance(self, ticker: str) -> dict:
         performance_tool = getattr(self.tool, "performance", None)
