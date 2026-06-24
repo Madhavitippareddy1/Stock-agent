@@ -85,7 +85,7 @@ jobs:
       always() &&
       github.event_name == 'push' &&
       vars.CICD_EMAIL_NOTIFICATIONS_ENABLED == 'true' &&
-      (needs.test.result == 'failure' || needs.build-and-deploy.result == 'failure')
+      (needs.test.result == 'failure' || needs['build-and-deploy'].result == 'failure')
     needs: [test, build-and-deploy]
     runs-on: ubuntu-latest
     steps:
