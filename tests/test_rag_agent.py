@@ -136,6 +136,17 @@ def test_generic_summary_request_uses_uploaded_chunks_without_keyword_overlap() 
     assert "Uploaded document" in result.answer
 
 
+def test_above_document_analysis_uses_uploaded_chunks_without_keyword_overlap() -> None:
+    result = RagAgent().run(
+        "analyse the above document",
+        ("MRVL",),
+        b"Marvell Technology annual report showed data center revenue growth.",
+        "text/plain",
+    )
+    assert result.sources == ["Uploaded document"]
+    assert "Marvell Technology" in result.answer
+
+
 def test_s3_rag_records_financial_report_tool_spans() -> None:
     observability = FakeObservability()
     result = RagAgent(

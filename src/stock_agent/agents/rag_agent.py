@@ -27,6 +27,21 @@ def _is_summary_request(question: str) -> bool:
     return any(
         phrase in lowered
         for phrase in ("summarize", "summary", "analyse this", "analyze this", "above report")
+    ) or (
+        any(word in lowered for word in ("analyse", "analyze", "summarise", "summarize"))
+        and any(
+            phrase in lowered
+            for phrase in (
+                "above document",
+                "above file",
+                "uploaded document",
+                "uploaded file",
+                "this document",
+                "this file",
+                "the document",
+                "the file",
+            )
+        )
     )
 
 
