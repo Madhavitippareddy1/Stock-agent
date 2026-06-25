@@ -17,6 +17,8 @@ class FakeObservation:
 class FakeObservability:
     def __init__(self) -> None:
         self.observations = []
+        self.trace_scores = []
+        self.span_scores = []
 
     def content(self, value, fallback):
         return fallback
@@ -29,6 +31,12 @@ class FakeObservability:
         observation = FakeObservation(name)
         self.observations.append({"name": name, "kwargs": kwargs, "observation": observation})
         yield observation
+
+    def score_current_trace(self, name: str, value: float, **kwargs) -> None:
+        self.trace_scores.append({"name": name, "value": value, **kwargs})
+
+    def score_current_span(self, name: str, value: float, **kwargs) -> None:
+        self.span_scores.append({"name": name, "value": value, **kwargs})
 
 
 def test_retrieve_ranks_relevant_chunk_first() -> None:
@@ -64,6 +72,10 @@ def test_uploaded_rag_records_extraction_chunking_and_retrieval_spans() -> None:
     assert "extract-uploaded-financial-report" in observation_names
     assert "chunk-financial-report-documents" in observation_names
     assert "keyword-retrieve-financial-report-chunks" in observation_names
+    assert any(
+        score["name"] == "rag_retrieval_match_count" and score["value"] == 1.0
+        for score in observability.trace_scores
+    )
 
 
 class FakeReports:

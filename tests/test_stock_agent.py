@@ -70,12 +70,20 @@ class FakeObservation:
 class FakeObservability:
     def __init__(self) -> None:
         self.observations = []
+        self.trace_scores = []
+        self.span_scores = []
 
     @contextmanager
     def observe(self, name: str, **kwargs):
         observation = FakeObservation(name)
         self.observations.append({"name": name, "kwargs": kwargs, "observation": observation})
         yield observation
+
+    def score_current_trace(self, name: str, value: float, **kwargs) -> None:
+        self.trace_scores.append({"name": name, "value": value, **kwargs})
+
+    def score_current_span(self, name: str, value: float, **kwargs) -> None:
+        self.span_scores.append({"name": name, "value": value, **kwargs})
 
 
 class FakeSearch:
@@ -148,6 +156,12 @@ def test_stock_agent_records_average_price_summary() -> None:
     assert price_update["output"]["min_price"] == 101.0
     assert price_update["output"]["max_price"] == 101.0
     assert price_update["output"]["currency"] == "USD"
+    assert {
+        (score["name"], score["value"]) for score in observability.span_scores
+    } >= {
+        ("stock_average_price", 101.0),
+        ("stock_price_available_ratio", 1.0),
+    }
 
 
 def test_stock_agent_formats_two_requested_stocks_only() -> None:

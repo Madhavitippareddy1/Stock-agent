@@ -258,6 +258,18 @@ class SupervisorAgent:
                         **self.observability.safe_text(answer, label="answer"),
                     }
                 )
+                self.observability.score_current_trace(
+                    "agent_source_count",
+                    float(len(sources)),
+                    comment="Number of unique sources returned in the final research response.",
+                    metadata={"agents": [item.agent for item in sections], "routes": routes},
+                )
+                self.observability.score_current_trace(
+                    "agent_route_count",
+                    float(len(routes)),
+                    comment="Number of specialist routes selected by the supervisor.",
+                    metadata={"routes": routes, "tickers": tickers},
+                )
             result = ResearchResult(answer=answer, sections=sections, sources=sources)
         self.observability.flush()
         return result

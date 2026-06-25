@@ -27,6 +27,8 @@ class FakeObservation:
 class FakeObservability:
     def __init__(self, *, capture_content: bool = False) -> None:
         self.observations = []
+        self.trace_scores = []
+        self.span_scores = []
         self.capture_content = capture_content
         self.flushed = False
 
@@ -46,6 +48,12 @@ class FakeObservability:
 
     def flush(self):
         self.flushed = True
+
+    def score_current_trace(self, name: str, value: float, **kwargs) -> None:
+        self.trace_scores.append({"name": name, "value": value, **kwargs})
+
+    def score_current_span(self, name: str, value: float, **kwargs) -> None:
+        self.span_scores.append({"name": name, "value": value, **kwargs})
 
 
 def test_extract_tickers_returns_selected_symbols() -> None:
@@ -290,4 +298,10 @@ def test_supervisor_records_query_details_in_langfuse_trace() -> None:
     assert "comparison" in query_details["detected_intents"]
     assert query_details["content_capture_enabled"] is False
     assert "query" not in query_details
+    assert {
+        (score["name"], score["value"]) for score in observability.trace_scores
+    } >= {
+        ("agent_source_count", 0.0),
+        ("agent_route_count", 1.0),
+    }
     assert observability.flushed is True

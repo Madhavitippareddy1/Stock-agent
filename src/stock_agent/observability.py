@@ -66,6 +66,48 @@ class Observability:
         if self.client:
             self.client.flush()
 
+    def score_current_trace(
+        self,
+        name: str,
+        value: float,
+        *,
+        comment: str | None = None,
+        metadata: Any = None,
+    ) -> None:
+        if not self.client:
+            return
+        try:
+            self.client.score_current_trace(
+                name=name,
+                value=value,
+                data_type="NUMERIC",
+                comment=comment,
+                metadata=metadata,
+            )
+        except Exception:
+            return
+
+    def score_current_span(
+        self,
+        name: str,
+        value: float,
+        *,
+        comment: str | None = None,
+        metadata: Any = None,
+    ) -> None:
+        if not self.client:
+            return
+        try:
+            self.client.score_current_span(
+                name=name,
+                value=value,
+                data_type="NUMERIC",
+                comment=comment,
+                metadata=metadata,
+            )
+        except Exception:
+            return
+
     def safe_text(self, value: str, *, label: str = "text") -> dict[str, Any]:
         if self.settings.langfuse_capture_content:
             return {label: value, "length": len(value)}

@@ -18,3 +18,10 @@ def test_content_is_redacted_by_default() -> None:
         "context_length": 14,
         "content_captured": False,
     }
+
+
+def test_scores_are_noops_without_langfuse_client() -> None:
+    observability = Observability(Settings(langfuse_enabled=True))
+
+    observability.score_current_trace("test_score", 1.0)
+    observability.score_current_span("test_score", 1.0)

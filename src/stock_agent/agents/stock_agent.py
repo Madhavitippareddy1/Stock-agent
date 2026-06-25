@@ -90,6 +90,29 @@ class StockDataAgent:
             ) as price_span:
                 if price_span:
                     price_span.update(output=price_summary)
+                if price_summary["available_price_count"]:
+                    self.observability.score_current_span(
+                        "stock_average_price",
+                        float(price_summary["average_price"]),
+                        comment="Average current price across requested stocks.",
+                        metadata={
+                            "tickers": price_summary["tickers"],
+                            "currency": price_summary["currency"],
+                            "mixed_currencies": price_summary["mixed_currencies"],
+                        },
+                    )
+                if quotes:
+                    availability_ratio = price_summary["available_price_count"] / len(quotes)
+                    self.observability.score_current_span(
+                        "stock_price_available_ratio",
+                        availability_ratio,
+                        comment="Share of requested stock quotes with current price available.",
+                        metadata={
+                            "available_price_count": price_summary["available_price_count"],
+                            "quote_count": len(quotes),
+                            "missing_price_count": price_summary["missing_price_count"],
+                        },
+                    )
             if agent_span:
                 agent_span.update(
                     output={

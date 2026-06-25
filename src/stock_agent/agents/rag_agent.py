@@ -139,10 +139,26 @@ class RagAgent:
                         }
                     )
             if not matches:
+                self.observability.score_current_trace(
+                    "rag_retrieval_match_count",
+                    0.0,
+                    comment="No vector-search financial report chunks matched the query.",
+                    metadata={"retrieval": "opensearch-vector", "tickers": tickers},
+                )
                 return AgentResult(
                     agent="RAG Agent",
                     answer="No relevant indexed financial-report content was found.",
                 )
+            self.observability.score_current_trace(
+                "rag_retrieval_match_count",
+                float(len(matches)),
+                comment="Number of vector-search financial report chunks retrieved.",
+                metadata={
+                    "retrieval": "opensearch-vector",
+                    "tickers": tickers,
+                    "sources": list(dict.fromkeys(match.source for match in matches)),
+                },
+            )
             context = "\n\n".join(f"[{match.source}]\n{match.text}" for match in matches)
             answer = self.bedrock.answer(
                 question,
@@ -260,6 +276,16 @@ class RagAgent:
                     ],
                 }
             )
+        self.observability.score_current_trace(
+            "rag_retrieval_match_count",
+            float(len(matches)),
+            comment="Number of keyword financial report chunks retrieved.",
+            metadata={
+                "retrieval": "keyword",
+                "uploaded_document": uploaded_content is not None,
+                "sources": list(dict.fromkeys(source for source, _ in matches)),
+            },
+        )
         if not matches:
             return AgentResult(
                 agent="RAG Agent",
